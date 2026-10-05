@@ -1,0 +1,626 @@
+Sources/main.swift:108:13: warning: mutation of captured var 'reply' in concurrently-executing code [#SendableClosureCaptures]
+106 |                 log("http status \((resp as? HTTPURLResponse)?.statusCode ?? -1)"); return
+107 |             }
+108 |             reply = try? JSONDecoder().decode(Reply.self, from: data)
+    |             `- warning: mutation of captured var 'reply' in concurrently-executing code [#SendableClosureCaptures]
+109 |         }.resume()
+110 |         sem.wait()
+
+Sources/main.swift:190:17: warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                 `- warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/objc/NSObject.h:66:1: note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+ 64 | 
+ 65 | + (void)initialize;
+ 66 | - (instancetype)init
+    | `- note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+ 67 | #if NS_ENFORCE_NSOBJECT_DESIGNATED_INITIALIZER
+ 68 |     NS_DESIGNATED_INITIALIZER
+
+Sources/main.swift:190:30: warning: main actor-isolated property 'messageText' can not be mutated from a nonisolated context
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                              `- warning: main actor-isolated property 'messageText' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:71:28: note: mutation of this property is only permitted within the actor
+ 69 | /// The text that is displayed prominently in the alert.
+ 70 | /// - Note: Use this string to get the user’s attention and communicate the reason for displaying the alert.
+ 71 | @property (copy) NSString *messageText;
+    |                            `- note: mutation of this property is only permitted within the actor
+ 72 | 
+ 73 | /// The descriptive text that provides more details about the reason for the alert.
+
+Sources/main.swift:190:51: warning: main actor-isolated property 'informativeText' can not be mutated from a nonisolated context
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                                                   `- warning: main actor-isolated property 'informativeText' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:75:28: note: mutation of this property is only permitted within the actor
+ 73 | /// The descriptive text that provides more details about the reason for the alert.
+ 74 | /// - Note: The informative text string is displayed below the message text and is less prominent. Use this string to provide additional context about the reason for the alert or about the actions that the user might take.
+ 75 | @property (copy) NSString *informativeText;
+    |                            `- note: mutation of this property is only permitted within the actor
+ 76 | 
+ 77 | // MARK: - Accessing a Custom Alert Icon
+
+Sources/main.swift:190:81: warning: call to main actor-isolated instance method 'activate(ignoringOtherApps:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                                                                                 `- warning: call to main actor-isolated instance method 'activate(ignoringOtherApps:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplication.h:222:1: note: calls to instance method 'activate(ignoringOtherApps:)' from outside of its actor context are implicitly asynchronous
+220 | /// Makes the receiver the active app.
+221 | /// - Parameter ignoreOtherApps: If `NO`, the app is activated only if no other app is currently active. If `YES`, the app activates regardless.
+222 | - (void)activateIgnoringOtherApps:(BOOL)ignoreOtherApps API_DEPRECATED("This method will be deprecated in a future release. Use NSApp.activate instead.", macos(10.0, API_TO_BE_DEPRECATED));
+    | |- note: calls to instance method 'activate(ignoringOtherApps:)' from outside of its actor context are implicitly asynchronous
+    | `- note: main actor isolation inferred from inheritance from class 'NSResponder'
+223 | 
+224 | /// Makes the receiver the active app, if possible.
+
+Sources/main.swift:190:75: warning: main actor-isolated var 'NSApp' can not be referenced from a nonisolated context
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                                                                           `- warning: main actor-isolated var 'NSApp' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplication.h:196:58: note: var declared here
+194 | @interface NSApplication : NSResponder <NSUserInterfaceValidations, NSMenuItemValidation, NSAccessibilityElement, NSAccessibility>
+195 | 
+196 | APPKIT_EXTERN __kindof NSApplication * _Null_unspecified NSApp NS_SWIFT_UI_ACTOR;
+    |                                                          `- note: var declared here
+197 | 
+198 | @property (class, readonly, strong) __kindof NSApplication *sharedApplication;
+
+Sources/main.swift:190:118: warning: call to main actor-isolated instance method 'runModal()' in a synchronous nonisolated context [#ActorIsolatedCall]
+187 |     }
+188 | 
+189 |     func alert(_ msg: String, _ info: String = "") {
+    |          `- note: add '@MainActor' to make instance method 'alert' part of global actor 'MainActor'
+190 |         let a = NSAlert(); a.messageText = msg; a.informativeText = info; NSApp.activate(ignoringOtherApps: true); a.runModal()
+    |                                                                                                                      `- warning: call to main actor-isolated instance method 'runModal()' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:152:1: note: calls to instance method 'runModal()' from outside of its actor context are implicitly asynchronous
+150 | 
+151 | /// Runs the alert as an app-modal dialog and returns the constant that identifies the button clicked.
+152 | - (NSModalResponse)runModal;
+    | `- note: calls to instance method 'runModal()' from outside of its actor context are implicitly asynchronous
+153 | 
+154 | /// Specifies whether the alert includes a suppression checkbox, which can be employed to allow a user to opt out of seeing the alert again.
+
+Sources/main.swift:197:17: warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+196 |         }
+197 |         let a = NSAlert()
+    |                 `- warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+198 |         a.messageText = "MacWake setup"
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/usr/include/objc/NSObject.h:66:1: note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+ 64 | 
+ 65 | + (void)initialize;
+ 66 | - (instancetype)init
+    | `- note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+ 67 | #if NS_ENFORCE_NSOBJECT_DESIGNATED_INITIALIZER
+ 68 |     NS_DESIGNATED_INITIALIZER
+
+Sources/main.swift:198:11: warning: main actor-isolated property 'messageText' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+196 |         }
+197 |         let a = NSAlert()
+198 |         a.messageText = "MacWake setup"
+    |           `- warning: main actor-isolated property 'messageText' can not be mutated from a nonisolated context
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:71:28: note: mutation of this property is only permitted within the actor
+ 69 | /// The text that is displayed prominently in the alert.
+ 70 | /// - Note: Use this string to get the user’s attention and communicate the reason for displaying the alert.
+ 71 | @property (copy) NSString *messageText;
+    |                            `- note: mutation of this property is only permitted within the actor
+ 72 | 
+ 73 | /// The descriptive text that provides more details about the reason for the alert.
+
+Sources/main.swift:199:11: warning: main actor-isolated property 'informativeText' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+197 |         let a = NSAlert()
+198 |         a.messageText = "MacWake setup"
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+    |           `- warning: main actor-isolated property 'informativeText' can not be mutated from a nonisolated context
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:75:28: note: mutation of this property is only permitted within the actor
+ 73 | /// The descriptive text that provides more details about the reason for the alert.
+ 74 | /// - Note: The informative text string is displayed below the message text and is less prominent. Use this string to provide additional context about the reason for the alert or about the actions that the user might take.
+ 75 | @property (copy) NSString *informativeText;
+    |                            `- note: mutation of this property is only permitted within the actor
+ 76 | 
+ 77 | // MARK: - Accessing a Custom Alert Icon
+
+Sources/main.swift:200:19: warning: call to main actor-isolated initializer 'init(string:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+198 |         a.messageText = "MacWake setup"
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+    |                   `- warning: call to main actor-isolated initializer 'init(string:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTextField.h:120:1: note: calls to initializer 'init(string:)' from outside of its actor context are implicitly asynchronous
+118 |  @return An initialized text field object.
+119 |  */
+120 | + (instancetype)textFieldWithString:(NSString *)stringValue API_AVAILABLE(macos(10.12));
+    | |- note: calls to initializer 'init(string:)' from outside of its actor context are implicitly asynchronous
+    | `- note: main actor isolation inferred from inheritance from class 'NSControl'
+121 | 
+122 | @end
+
+Sources/main.swift:200:56: warning: main actor-isolated property 'placeholderString' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+198 |         a.messageText = "MacWake setup"
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+    |                                                        `- warning: main actor-isolated property 'placeholderString' can not be mutated from a nonisolated context
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTextField.h:22:38: note: mutation of this property is only permitted within the actor
+ 20 | @interface NSTextField : NSControl <NSUserInterfaceValidations, NSAccessibilityNavigableStaticText, NSTextContent>
+ 21 | 
+ 22 | @property (nullable, copy) NSString *placeholderString API_AVAILABLE(macos(10.10));
+    |                                      `- note: mutation of this property is only permitted within the actor
+ 23 | @property (nullable, copy) NSAttributedString *placeholderAttributedString API_AVAILABLE(macos(10.10));
+ 24 | 
+
+Sources/main.swift:201:19: warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+    |                   `- warning: call to main actor-isolated initializer 'init()' in a synchronous nonisolated context [#ActorIsolatedCall]
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSResponder.h:23:1: note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+ 21 | @interface NSResponder : NSObject <NSCoding>
+ 22 | 
+ 23 | - (instancetype)init NS_DESIGNATED_INITIALIZER;
+    | |- note: calls to initializer 'init()' from outside of its actor context are implicitly asynchronous
+    | `- note: main actor isolation inferred from inheritance from class 'NSTextField'
+ 24 | - (nullable instancetype)initWithCoder:(NSCoder *)coder NS_DESIGNATED_INITIALIZER;
+ 25 | 
+
+Sources/main.swift:201:44: warning: main actor-isolated property 'placeholderString' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+199 |         a.informativeText = "Paste the console URL and admin token printed by deploy.sh.\nInstalls a background service that wakes this Mac on a timer and checks the console. You will be asked for your password."
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+    |                                            `- warning: main actor-isolated property 'placeholderString' can not be mutated from a nonisolated context
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSTextField.h:22:38: note: mutation of this property is only permitted within the actor
+ 20 | @interface NSTextField : NSControl <NSUserInterfaceValidations, NSAccessibilityNavigableStaticText, NSTextContent>
+ 21 | 
+ 22 | @property (nullable, copy) NSString *placeholderString API_AVAILABLE(macos(10.10));
+    |                                      `- note: mutation of this property is only permitted within the actor
+ 23 | @property (nullable, copy) NSAttributedString *placeholderAttributedString API_AVAILABLE(macos(10.10));
+ 24 | 
+
+Sources/main.swift:202:21: warning: call to main actor-isolated initializer 'init(views:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+    |                     `- warning: call to main actor-isolated initializer 'init(views:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSStackView.h:108:1: note: calls to initializer 'init(views:)' from outside of its actor context are implicitly asynchronous
+106 | @interface NSStackView : NSView
+107 | 
+108 | + (instancetype)stackViewWithViews:(NSArray<NSView *> *)views; // Returns an autoreleased horizontal StackView with the provided views set as the leading views, and has translatesAutoresizingMaskIntoConstraints set to NO.
+    | |- note: calls to initializer 'init(views:)' from outside of its actor context are implicitly asynchronous
+    | `- note: main actor isolation inferred from inheritance from class 'NSView'
+109 | 
+110 | #pragma mark General StackView Properties
+
+Sources/main.swift:202:59: warning: main actor-isolated property 'orientation' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+    |                                                           `- warning: main actor-isolated property 'orientation' can not be mutated from a nonisolated context
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSStackView.h:115:44: note: mutation of this property is only permitted within the actor
+113 | 
+114 | /// Orientation of the StackView, defaults to NSUserInterfaceLayoutOrientationHorizontal
+115 | @property NSUserInterfaceLayoutOrientation orientation;
+    |                                            `- note: mutation of this property is only permitted within the actor
+116 | 
+117 | #if !TARGET_OS_IPHONE
+
+Sources/main.swift:202:90: warning: main actor-isolated property 'alignment' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+200 |         let url = NSTextField(string: consoleURL); url.placeholderString = "https://macwake.you.workers.dev"
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+    |                                                                                          `- warning: main actor-isolated property 'alignment' can not be mutated from a nonisolated context
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSStackView.h:120:29: note: mutation of this property is only permitted within the actor
+118 | 
+119 | /// Describes how subviews are aligned within the StackView, defaults to `NSLayoutAttributeCenterY` for horizontal stacks, `NSLayoutAttributeCenterX` for vertical stacks. Setting `NSLayoutAttributeNotAnAttribute` will cause the internal alignment constraints to not be created, and could result in an ambiguous layout. Setting an inapplicable attribute for the set orientation will result in the alignment being ignored (similar to its handling with NSLayoutAttributeNotAnAttribute). The alignment constraints are established at a priority of `NSLayoutPriorityDefaultLow` and are overridable for individual views using external constraints.
+120 | @property NSLayoutAttribute alignment;
+    |                             `- note: mutation of this property is only permitted within the actor
+121 | #endif
+122 | 
+
+Sources/main.swift:203:15: warning: main actor-isolated property 'translatesAutoresizingMaskIntoConstraints' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+201 |         let tok = NSSecureTextField(); tok.placeholderString = "admin token"
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+    |               `- warning: main actor-isolated property 'translatesAutoresizingMaskIntoConstraints' can not be mutated from a nonisolated context
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+205 |         url.widthAnchor.constraint(equalToConstant: 360).isActive = true
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutConstraint.h:276:16: note: mutation of this property is only permitted within the actor
+274 | /* by default, the autoresizing mask on a view gives rise to constraints that fully determine the view's position.  To do anything interesting with constraints, you need to turn that off. IB will turn it off.
+275 |  */
+276 | @property BOOL translatesAutoresizingMaskIntoConstraints API_AVAILABLE(macos(10.7));
+    |                `- note: mutation of this property is only permitted within the actor
+277 | 
+278 | /* constraint based layout engages lazily when someone tries to use it.  If you do all of your constraint set up in -updateConstraints, you might never even receive updateConstraints if no one makes a constraint.  To fix this chicken and egg problem, override this method to return YES if your view needs the window to use constraint based layout.  
+
+Sources/main.swift:204:15: warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+202 |         let stack = NSStackView(views: [url, tok]); stack.orientation = .vertical; stack.alignment = .leading
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+    |               `- warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+205 |         url.widthAnchor.constraint(equalToConstant: 360).isActive = true
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutConstraint.h:230:49: note: property declared here
+228 | @property (readonly, strong) NSLayoutYAxisAnchor *topAnchor API_AVAILABLE(macos(10.11));
+229 | @property (readonly, strong) NSLayoutYAxisAnchor *bottomAnchor API_AVAILABLE(macos(10.11));
+230 | @property (readonly, strong) NSLayoutDimension *widthAnchor API_AVAILABLE(macos(10.11));
+    |                                                 `- note: property declared here
+231 | @property (readonly, strong) NSLayoutDimension *heightAnchor API_AVAILABLE(macos(10.11));
+232 | @property (readonly, strong) NSLayoutXAxisAnchor *centerXAnchor API_AVAILABLE(macos(10.11));
+
+Sources/main.swift:205:13: warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+203 |         stack.translatesAutoresizingMaskIntoConstraints = false
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+205 |         url.widthAnchor.constraint(equalToConstant: 360).isActive = true
+    |             `- warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+207 |         a.accessoryView = stack
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutConstraint.h:230:49: note: property declared here
+228 | @property (readonly, strong) NSLayoutYAxisAnchor *topAnchor API_AVAILABLE(macos(10.11));
+229 | @property (readonly, strong) NSLayoutYAxisAnchor *bottomAnchor API_AVAILABLE(macos(10.11));
+230 | @property (readonly, strong) NSLayoutDimension *widthAnchor API_AVAILABLE(macos(10.11));
+    |                                                 `- note: property declared here
+231 | @property (readonly, strong) NSLayoutDimension *heightAnchor API_AVAILABLE(macos(10.11));
+232 | @property (readonly, strong) NSLayoutXAxisAnchor *centerXAnchor API_AVAILABLE(macos(10.11));
+
+Sources/main.swift:206:13: warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+204 |         stack.widthAnchor.constraint(equalToConstant: 360).isActive = true
+205 |         url.widthAnchor.constraint(equalToConstant: 360).isActive = true
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+    |             `- warning: main actor-isolated property 'widthAnchor' can not be referenced from a nonisolated context
+207 |         a.accessoryView = stack
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSLayoutConstraint.h:230:49: note: property declared here
+228 | @property (readonly, strong) NSLayoutYAxisAnchor *topAnchor API_AVAILABLE(macos(10.11));
+229 | @property (readonly, strong) NSLayoutYAxisAnchor *bottomAnchor API_AVAILABLE(macos(10.11));
+230 | @property (readonly, strong) NSLayoutDimension *widthAnchor API_AVAILABLE(macos(10.11));
+    |                                                 `- note: property declared here
+231 | @property (readonly, strong) NSLayoutDimension *heightAnchor API_AVAILABLE(macos(10.11));
+232 | @property (readonly, strong) NSLayoutXAxisAnchor *centerXAnchor API_AVAILABLE(macos(10.11));
+
+Sources/main.swift:207:11: warning: main actor-isolated property 'accessoryView' can not be mutated from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+205 |         url.widthAnchor.constraint(equalToConstant: 360).isActive = true
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+207 |         a.accessoryView = stack
+    |           `- warning: main actor-isolated property 'accessoryView' can not be mutated from a nonisolated context
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+209 |         NSApp.activate(ignoringOtherApps: true)
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:143:38: note: mutation of this property is only permitted within the actor
+141 | 
+142 | /// The accessory view displayed in the alert, placed between the informative text or suppression checkbox (if present) and the response buttons. Before changing the location of the accessory view, first call the `-layout` method.
+143 | @property (nullable, strong) NSView *accessoryView API_AVAILABLE(macos(10.5));
+    |                                      `- note: mutation of this property is only permitted within the actor
+144 | 
+145 | /// Specifies that the alert must do immediate layout instead of lazily just before display.
+
+Sources/main.swift:208:11: warning: call to main actor-isolated instance method 'addButton(withTitle:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+207 |         a.accessoryView = stack
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+    |           `- warning: call to main actor-isolated instance method 'addButton(withTitle:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+209 |         NSApp.activate(ignoringOtherApps: true)
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:112:1: note: calls to instance method 'addButton(withTitle:)' from outside of its actor context are implicitly asynchronous
+110 | /// - Parameter title: Title of the button to add to the alert.
+111 | /// - Returns: The button that was added to the alert.
+112 | - (NSButton *)addButtonWithTitle:(NSString *)title;
+    | `- note: calls to instance method 'addButton(withTitle:)' from outside of its actor context are implicitly asynchronous
+113 | 
+114 | /// The array of response buttons for the alert.
+
+Sources/main.swift:208:46: warning: call to main actor-isolated instance method 'addButton(withTitle:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+206 |         tok.widthAnchor.constraint(equalToConstant: 360).isActive = true
+207 |         a.accessoryView = stack
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+    |                                              `- warning: call to main actor-isolated instance method 'addButton(withTitle:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+209 |         NSApp.activate(ignoringOtherApps: true)
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:112:1: note: calls to instance method 'addButton(withTitle:)' from outside of its actor context are implicitly asynchronous
+110 | /// - Parameter title: Title of the button to add to the alert.
+111 | /// - Returns: The button that was added to the alert.
+112 | - (NSButton *)addButtonWithTitle:(NSString *)title;
+    | `- note: calls to instance method 'addButton(withTitle:)' from outside of its actor context are implicitly asynchronous
+113 | 
+114 | /// The array of response buttons for the alert.
+
+Sources/main.swift:209:15: warning: call to main actor-isolated instance method 'activate(ignoringOtherApps:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+207 |         a.accessoryView = stack
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+209 |         NSApp.activate(ignoringOtherApps: true)
+    |               `- warning: call to main actor-isolated instance method 'activate(ignoringOtherApps:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+211 |         var u = url.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplication.h:222:1: note: calls to instance method 'activate(ignoringOtherApps:)' from outside of its actor context are implicitly asynchronous
+220 | /// Makes the receiver the active app.
+221 | /// - Parameter ignoreOtherApps: If `NO`, the app is activated only if no other app is currently active. If `YES`, the app activates regardless.
+222 | - (void)activateIgnoringOtherApps:(BOOL)ignoreOtherApps API_DEPRECATED("This method will be deprecated in a future release. Use NSApp.activate instead.", macos(10.0, API_TO_BE_DEPRECATED));
+    | |- note: calls to instance method 'activate(ignoringOtherApps:)' from outside of its actor context are implicitly asynchronous
+    | `- note: main actor isolation inferred from inheritance from class 'NSResponder'
+223 | 
+224 | /// Makes the receiver the active app, if possible.
+
+Sources/main.swift:209:9: warning: main actor-isolated var 'NSApp' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+207 |         a.accessoryView = stack
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+209 |         NSApp.activate(ignoringOtherApps: true)
+    |         `- warning: main actor-isolated var 'NSApp' can not be referenced from a nonisolated context
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+211 |         var u = url.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSApplication.h:196:58: note: var declared here
+194 | @interface NSApplication : NSResponder <NSUserInterfaceValidations, NSMenuItemValidation, NSAccessibilityElement, NSAccessibility>
+195 | 
+196 | APPKIT_EXTERN __kindof NSApplication * _Null_unspecified NSApp NS_SWIFT_UI_ACTOR;
+    |                                                          `- note: var declared here
+197 | 
+198 | @property (class, readonly, strong) __kindof NSApplication *sharedApplication;
+
+Sources/main.swift:210:17: warning: call to main actor-isolated instance method 'runModal()' in a synchronous nonisolated context [#ActorIsolatedCall]
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+208 |         a.addButton(withTitle: "Install"); a.addButton(withTitle: "Cancel")
+209 |         NSApp.activate(ignoringOtherApps: true)
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+    |                 `- warning: call to main actor-isolated instance method 'runModal()' in a synchronous nonisolated context [#ActorIsolatedCall]
+211 |         var u = url.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+212 |         while u.hasSuffix("/") { u.removeLast() }
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSAlert.h:152:1: note: calls to instance method 'runModal()' from outside of its actor context are implicitly asynchronous
+150 | 
+151 | /// Runs the alert as an app-modal dialog and returns the constant that identifies the button clicked.
+152 | - (NSModalResponse)runModal;
+    | `- note: calls to instance method 'runModal()' from outside of its actor context are implicitly asynchronous
+153 | 
+154 | /// Specifies whether the alert includes a suppression checkbox, which can be employed to allow a user to opt out of seeing the alert again.
+
+Sources/main.swift:211:21: warning: main actor-isolated property 'stringValue' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+209 |         NSApp.activate(ignoringOtherApps: true)
+210 |         guard a.runModal() == .alertFirstButtonReturn else { return }
+211 |         var u = url.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    |                     `- warning: main actor-isolated property 'stringValue' can not be referenced from a nonisolated context
+212 |         while u.hasSuffix("/") { u.removeLast() }
+213 |         let t = tok.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSControl.h:36:28: note: property declared here
+ 34 | 
+ 35 | @property (nullable, copy) id  /* id<NSCopying> */ objectValue;
+ 36 | @property (copy) NSString *stringValue;
+    |                            `- note: property declared here
+ 37 | @property (copy) NSAttributedString *attributedStringValue;
+ 38 | @property int intValue;
+
+Sources/main.swift:213:21: warning: main actor-isolated property 'stringValue' can not be referenced from a nonisolated context
+191 |     }
+192 | 
+193 |     @objc func setup() {
+    |                `- note: add '@MainActor' to make instance method 'setup()' part of global actor 'MainActor'
+194 |         if Bundle.main.bundlePath.hasPrefix("/Volumes/") {
+195 |             alert("Move MacWake to Applications first", "Drag MacWake.app into the Applications folder, then open it from there."); return
+    :
+211 |         var u = url.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+212 |         while u.hasSuffix("/") { u.removeLast() }
+213 |         let t = tok.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    |                     `- warning: main actor-isolated property 'stringValue' can not be referenced from a nonisolated context
+214 |         guard u.hasPrefix("http"), !t.isEmpty else { alert("Need both a URL starting with https:// and a token"); return }
+215 |         UserDefaults.standard.set(u, forKey: "url")
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX27.0.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSControl.h:36:28: note: property declared here
+ 34 | 
+ 35 | @property (nullable, copy) id  /* id<NSCopying> */ objectValue;
+ 36 | @property (copy) NSString *stringValue;
+    |                            `- note: property declared here
+ 37 | @property (copy) NSAttributedString *attributedStringValue;
+ 38 | @property int intValue;
+
+[#ActorIsolatedCall]: <https://docs.swift.org/compiler/documentation/diagnostics/actor-isolated-call>
+[#SendableClosureCaptures]: <https://docs.swift.org/compiler/documentation/diagnostics/sendable-closure-captures>

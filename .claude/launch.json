@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "macwake-console",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "console-next", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3002"],
+      "port": 3002,
+      "autoPort": false
+    }
+  ]
+}

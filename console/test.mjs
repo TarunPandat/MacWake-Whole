@@ -1,0 +1,33 @@
+// node test.mjs  -- runs the worker against an in-memory KV, no network.
+import worker from "./worker.js";
+const mem = new Map();
+const isJson = t => t === "json" || (t && t.type === "json");
+const env = { ADMIN_TOKEN: "s3cret", STATE: { get: async (k, t) => mem.has(k) ? (isJson(t) ? JSON.parse(mem.get(k)) : mem.get(k)) : null, put: async (k, v) => { mem.set(k, v); } } };
+const call = (path, body, token = "s3cret") => worker.fetch(new Request("https://x" + path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + token }, body: body && JSON.stringify(body) }), env);
+const j = async r => [r.status, await r.json().catch(() => null)];
+const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(m + ": " + JSON.stringify(a) + " != " + JSON.stringify(b)); };
+
+eq((await call("/api/state", null, "wrong")).status, 401, "bad token");
+eq((await call("/api/state", null, "")).status, 401, "empty token");
+eq((await worker.fetch(new Request("https://x/"), env)).status, 200, "page");
+let [, s] = await j(await call("/api/state")); eq(s.phase, "idle", "initial idle");
+let [, hb] = await j(await call("/api/heartbeat", { ac: true, battery: 80, host: "mbp" })); eq(hb.wake, false, "no wake pending");
+[, s] = await j(await call("/api/wake")); eq(s.phase, "requested", "requested");
+[, hb] = await j(await call("/api/heartbeat", { ac: true, battery: 80, host: "mbp" })); eq([hb.wake, hb.hold], [true, true], "mac told to wake once");
+[, hb] = await j(await call("/api/heartbeat", { ac: true, holding: true, host: "mbp" })); eq([hb.wake, hb.hold], [false, true], "second heartbeat: already acked, still hold");
+[, s] = await j(await call("/api/state")); eq(s.phase, "awake", "awake after ack");
+[, hb] = await j(await call("/api/heartbeat", { ac: true, holding: false, host: "mbp" })); eq([hb.wake, hb.hold], [true, true], "hold dropped inside window: wake re-delivered");
+[, hb] = await j(await call("/api/heartbeat", { ac: true, holding: true, host: "mbp" })); eq(hb.wake, false, "holding again, no re-delivery");
+mem.set("device", JSON.stringify({ ...JSON.parse(mem.get("device")), holding: false, ackAt: Date.now() - 31 * 60e3 }));
+[, hb] = await j(await call("/api/heartbeat", { ac: true, holding: false, host: "mbp" })); eq(hb.wake, false, "hold window over: no re-delivery");
+[, s] = await j(await call("/api/state")); eq(s.phase, "done", "done after hold expired");
+[, s] = await j(await call("/api/wake")); eq(s.phase, "requested", "wake again from done");
+[, hb] = await j(await call("/api/heartbeat", { ac: true, holding: false, host: "mbp" })); eq(hb.wake, true, "second wake delivered");
+[, s] = await j(await call("/api/state")); eq(s.phase, "awake", "awake again (ack heartbeat implies holding)");
+[, s] = await j(await call("/api/cancel")); eq(s.phase, "idle", "released");
+[, hb] = await j(await call("/api/heartbeat", { ac: false, holding: false, host: "mbp" })); eq(hb.hold, false, "mac told to stop holding");
+[, s] = await j(await call("/api/wake")); [, s] = await j(await call("/api/cancel")); eq(s.phase, "idle", "cancel before ack");
+[, hb] = await j(await call("/api/heartbeat", { host: "mbp" })); eq(hb.wake, false, "cancelled request not delivered");
+[, s] = await j(await call("/api/settings", { interval: 999, hold: "x" })); eq(s.settings, { interval: 240, hold: 30 }, "settings clamp");
+[, hb] = await j(await call("/api/heartbeat", { host: "mbp" })); eq([hb.interval, hb.holdMinutes], [240, 30], "settings reach mac");
+console.log("ok");
