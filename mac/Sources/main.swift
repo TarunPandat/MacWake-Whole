@@ -95,11 +95,19 @@ final class Daemon {
     // instant/push are optional so older consoles (e.g. the Cloudflare worker) keep working.
     struct Reply: Decodable { var wake: Bool; var hold: Bool; var interval: Double; var holdMinutes: Double; var instant: Bool?; var push: String? }
 
-    /// Instant mode on charger keeps the Mac out of system sleep (screen still turns off), so pushes arrive in seconds.
+    /// Instant mode on charger keeps the Mac out of idle sleep (screen still turns off), so pushes arrive in seconds.
     var listening: Bool { instant && onAC }
+    var listenIDs: [IOPMAssertionID] = []
 
-    /// Sleep stays disabled while checking in after a wake, during a requested hold, or while listening.
-    func updateLock() { lockSleep(checkingIn || holdUntil != nil || listening) }
+    /// `disablesleep` also greys out Sleep in the Apple menu and blocks `pmset sleepnow`, so it is held only while
+    /// checking in after a wake, or while holding/listening with the lid closed (assertions can't beat lid-close sleep).
+    /// With the lid open, assertions keep the Mac up and Sleep still works; listening resumes at the next wake.
+    func updateLock() {
+        lockSleep(checkingIn || ((holdUntil != nil || listening) && lidWouldSleep()))
+        guard listening != !listenIDs.isEmpty else { return }
+        listenIDs.forEach { IOPMAssertionRelease($0) }
+        listenIDs = listening ? Daemon.keepAwake.map { assertion($0, "MacWake listening") } : []
+    }
 
     /// Long-lived stream from the push relay; every message means "check in now".
     func startPushListener() {
@@ -135,7 +143,7 @@ final class Daemon {
     static let keepAwake = [kIOPMAssertionTypePreventSystemSleep as String, kIOPMAssertNetworkClientActive as String]
 
     /// `pmset disablesleep` is the only switch that beats lid-close sleep and works on battery
-    /// (app assertions are ignored in both cases). Held only during a check-in or a requested hold.
+    /// (app assertions are ignored in both cases). See updateLock for when it is held.
     var sleepLocked = false
     func lockSleep(_ on: Bool, force: Bool = false) {
         guard force || on != sleepLocked else { return }
@@ -155,6 +163,7 @@ final class Daemon {
             let justWoke = w != lastWake
             lastWake = w
             if let until = holdUntil, now > until { release(); log("hold expired") }
+            updateLock()          // follows the lid
             let pushed = takePoke()
             if pushed { log("push received, checking in") }
             if justWoke || pushed || now.timeIntervalSince(lastPoll) >= 60 {
@@ -228,6 +237,7 @@ final class Daemon {
         } else {
             var id: IOPMAssertionID = 0
             IOPMAssertionDeclareUserActivity(fullOwner as CFString, kIOPMUserActiveLocal, &id)   // full wake, display on
+            holdIDs.append(id)
             log("wake requested: holding awake for \(Int(minutes)) min, display on")
         }
     }
@@ -344,6 +354,8 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !installed || Token.load() == nil { DispatchQueue.main.async { self.setup() } }
         else if CommandLine.arguments.contains("--setup") { DispatchQueue.main.async { self.setup() } }
         else if CommandLine.arguments.contains("--pair") { DispatchQueue.main.async { self.showPairing() } }
+        // A newer app than the installed background service: reinstall it (same token, asks for the password once).
+        else if !FileManager.default.contentsEqual(atPath: Bundle.main.executablePath!, andPath: supportDir + "/MacWake") { DispatchQueue.main.async { self.setup() } }
     }
 
     func menuWillOpen(_ menu: NSMenu) { rebuild() }
