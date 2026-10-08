@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- MacWake tab icon: night tile, closed lid edge-on, glowing sleep light. Drawn big enough to read at 16 px. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2e66"/>
+      <stop offset="1" stop-color="#12142b"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-200%" width="220%" height="500%">
+      <feGaussianBlur stdDeviation="1.6"/>
+    </filter>
+  </defs>
+  <rect width="32" height="32" rx="7.5" fill="url(#tile)"/>
+  <rect x="5" y="11.5" width="22" height="3.5" rx="1.75" fill="#5a5fa8"/>
+  <rect x="10.5" y="18.5" width="11" height="4" rx="2" fill="#fff7e8" opacity=".9" filter="url(#glow)"/>
+  <rect x="10.5" y="18.5" width="11" height="4" rx="2" fill="#fff7e8"/>
+</svg>

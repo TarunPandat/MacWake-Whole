@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Base application theme. -->
+    <!-- Dark only, like the app. -->
+    <style name="AppTheme" parent="Theme.AppCompat.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Launch: the app's background color until Splash in App.tsx takes over. -->
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/splash_bg</item>
+    </style>
+
+</resources>

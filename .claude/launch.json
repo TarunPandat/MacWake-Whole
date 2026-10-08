@@ -4,8 +4,54 @@
     {
       "name": "macwake-console",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "console-next", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3002"],
+      "runtimeArgs": [
+        "--prefix",
+        "console-next",
+        "run",
+        "dev",
+        "--",
+        "-H",
+        "0.0.0.0",
+        "-p",
+        "3002"
+      ],
       "port": 3002,
+      "autoPort": false
+    },
+    {
+      "name": "macwake-console-test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "console-next",
+        "run",
+        "dev",
+        "--",
+        "-H",
+        "0.0.0.0",
+        "-p",
+        "3003"
+      ],
+      "env": {
+        "MACWAKE_STATE_FILE": "/private/tmp/claude-501/-Users-tarunbhardwaj-Desktop-projects-Mac-Remote/59b33bc0-4266-44d6-a5ef-92cd1cce6a68/scratchpad/console-state.json",
+        "NTFY_URL": "off"
+      },
+      "port": 3003,
+      "autoPort": false
+    },
+    {
+      "name": "macwake-website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "website",
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3004"
+      ],
+      "port": 3004,
       "autoPort": false
     }
   ]

@@ -28,6 +28,7 @@ Instant off, wake latency is up to the check-in interval (default 5 min, 10 min 
 | `console/` | Web console + API. One file Cloudflare Worker, state in Workers KV. |
 | `console-next/` | Same console + API as a Next.js app (deploy on Vercel + Upstash Redis). Use this **or** `console/`. |
 | `mac/` | Menu-bar app + background service (Swift). `build.sh` makes `dist/MacWake.dmg`. |
+| `mobile/` | React Native CLI project for iPhone and iPad: tested console logic in `src/core.ts`, app screen still the template. See [mobile/README.md](mobile/README.md). |
 | `lan-relay/` | Optional: classic Wake-on-LAN relay if you ever have an always-on box at home (instant wake). |
 
 ## 1. Deploy the console (once, 2 minutes)
