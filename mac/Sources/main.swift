@@ -100,10 +100,11 @@ final class Daemon {
     var listenIDs: [IOPMAssertionID] = []
 
     /// `disablesleep` also greys out Sleep in the Apple menu and blocks `pmset sleepnow`, so it is held only while
-    /// checking in after a wake, or while holding/listening with the lid closed (assertions can't beat lid-close sleep).
-    /// With the lid open, assertions keep the Mac up and Sleep still works; listening resumes at the next wake.
+    /// checking in after a wake, holding with the lid closed, or listening when closing the lid would sleep the Mac
+    /// (assertions can't beat lid-close sleep). A hold locks on any closed lid: with an external display, macOS still
+    /// sleeps the Mac the moment that display blinks off. With the lid open, assertions keep the Mac up and Sleep works.
     func updateLock() {
-        lockSleep(checkingIn || ((holdUntil != nil || listening) && lidWouldSleep()))
+        lockSleep(checkingIn || (holdUntil != nil && lidClosed()) || (listening && lidWouldSleep()))
         guard listening != !listenIDs.isEmpty else { return }
         listenIDs.forEach { IOPMAssertionRelease($0) }
         listenIDs = listening ? Daemon.keepAwake.map { assertion($0, "MacWake listening") } : []
@@ -232,14 +233,11 @@ final class Daemon {
         updateLock()
         holdIDs = (Daemon.keepAwake + [kIOPMAssertionTypePreventUserIdleSystemSleep as String, kIOPMAssertionTypePreventUserIdleDisplaySleep as String])
             .map { assertion($0, "MacWake remote wake") }
-        if lidClosed() {
-            log("wake requested: lid closed, staying awake \(Int(minutes)) min with the screen off (SSH / Screen Sharing OK)")
-        } else {
-            var id: IOPMAssertionID = 0
-            IOPMAssertionDeclareUserActivity(fullOwner as CFString, kIOPMUserActiveLocal, &id)   // full wake, display on
-            holdIDs.append(id)
-            log("wake requested: holding awake for \(Int(minutes)) min, display on")
-        }
+        // Full wake, display on: the built-in screen with the lid open, an external display with it closed.
+        var id: IOPMAssertionID = 0
+        IOPMAssertionDeclareUserActivity(fullOwner as CFString, kIOPMUserActiveLocal, &id)
+        holdIDs.append(id)
+        log("wake requested: holding awake for \(Int(minutes)) min, " + (lidClosed() ? "lid closed (external display on if connected; SSH / Screen Sharing OK)" : "display on"))
     }
 
     func dropAssertions() {
