@@ -51,13 +51,13 @@ export class ApiError extends Error {
   }
 }
 
-/** One console call. Throws ApiError with a sentence a person can act on. */
-export async function api(
+/** One console call returning its JSON. Throws ApiError with a sentence a person can act on. */
+export async function request<T = unknown>(
   session: Session,
   action: string,
   body?: object,
   timeoutMs = 12000,
-): Promise<State> {
+): Promise<T> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let r: Response;
@@ -84,6 +84,17 @@ export async function api(
       j.error || `The console returned an error (${r.status}). Try again.`,
       r.status,
     );
+  return j as T;
+}
+
+/** A console call that answers with the Mac's state (state, wake, cancel, settings). */
+export async function api(
+  session: Session,
+  action: string,
+  body?: object,
+  timeoutMs = 12000,
+): Promise<State> {
+  const j = await request<Partial<State>>(session, action, body, timeoutMs);
   // Any web server answers 200; only a MacWake console sends a state the screen can draw.
   if (typeof j.phase !== 'string' || !j.device || !j.settings)
     throw new ApiError("That address isn't a MacWake console.", 0);
@@ -249,3 +260,57 @@ export function deriveView(s: State | null, nowLocal: number, skew = 0): View {
     pollMs: s?.phase === 'requested' ? 2000 : 8000,
   };
 }
+
+// Live screen: viewer decisions, mirrored from console-next/lib/screen.js. Keep the text identical.
+export type ScreenError =
+  | 'disabled'
+  | 'permission'
+  | 'no-display'
+  | 'failed'
+  | 'timeout'
+  | 'ice'
+  | 'lost';
+export const SCREEN_MESSAGES: Record<ScreenError, string> = {
+  disabled: 'Screen viewing is turned off on the Mac.',
+  permission:
+    'MacWake needs Screen Recording permission on the Mac (System Settings → Privacy & Security → Screen Recording).',
+  'no-display': "The Mac's screen is off (lid closed, no external display).",
+  failed: "The Mac couldn't start sharing its screen. Try again.",
+  timeout:
+    "The Mac didn't answer. Check that MacWake is running and someone is logged in.",
+  ice: "Couldn't connect directly to the Mac. Add a free TURN relay to the console (see README).",
+  lost: 'Connection lost.',
+};
+/** How long the viewer waits for the Mac's answer before checking whether it is still waking. */
+export const ANSWER_WAIT = 20e3;
+export type IceServer = { urls: string[]; username?: string; credential?: string };
+export type Answer = { id: string; sdp?: string; error?: string; at: number } | null;
+export type ScreenReply = {
+  ice: IceServer[];
+  push: string | null;
+  offer: { id: string; sdp: string; at: number } | null;
+  answer: Answer;
+};
+export type Next =
+  | { kind: 'answer'; sdp: string }
+  | { kind: 'error'; error: ScreenError }
+  | { kind: 'wait' }
+  | { kind: 'reoffer' };
+
+/** What the viewer does after polling for the answer to offer `id`. `phase` is the console's phase. */
+export function afterPoll(answer: Answer, id: string, waited: number, phase?: string): Next {
+  if (answer && answer.id === id) {
+    if (answer.sdp) return { kind: 'answer', sdp: answer.sdp };
+    const e = answer.error ?? '';
+    return { kind: 'error', error: e in SCREEN_MESSAGES ? (e as ScreenError) : 'failed' };
+  }
+  if (waited < ANSWER_WAIT) return { kind: 'wait' };
+  return phase === 'requested' ? { kind: 'reoffer' } : { kind: 'error', error: 'timeout' };
+}
+
+/** Watching also asks for a wake (it holds the Mac awake), unless one is already holding or on its way. */
+export const needsWake = (phase?: string) => phase !== 'awake' && phase !== 'requested';
+
+/** Matches an answer to its offer. Not a secret, so Math.random is enough (Hermes has no crypto.getRandomValues). */
+export const newId = () =>
+  Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');

@@ -1,11 +1,16 @@
 // npm run test:core  -- Node 24 runs TypeScript directly (type stripping). No server, no device.
 import http from 'node:http';
 import {
+  afterPoll,
   api,
   ApiError,
   deriveView,
+  needsWake,
+  newId,
   normalizeUrl,
   parsePairing,
+  request,
+  SCREEN_MESSAGES,
   type State,
 } from './core.ts';
 
@@ -34,6 +39,46 @@ eq(
   normalizeUrl('mac-wake-console.vercel.app/'),
   'https://mac-wake-console.vercel.app',
   'adds https, strips slash',
+);
+
+// Live screen decisions (mirror console-next/lib/screen.js)
+eq(afterPoll(null, 'a', 1000, 'awake'), { kind: 'wait' }, 'no answer yet');
+eq(
+  afterPoll({ id: 'b', sdp: 'x', at: 0 }, 'a', 1000, 'awake'),
+  { kind: 'wait' },
+  'an answer to another offer is ignored',
+);
+eq(
+  afterPoll({ id: 'a', sdp: 'x', at: 0 }, 'a', 1000, 'awake'),
+  { kind: 'answer', sdp: 'x' },
+  'answer',
+);
+eq(
+  afterPoll({ id: 'a', error: 'permission', at: 0 }, 'a', 1000, 'awake'),
+  { kind: 'error', error: 'permission' },
+  'Mac refused',
+);
+eq(
+  afterPoll({ id: 'a', error: 'weird', at: 0 }, 'a', 1000, 'awake'),
+  { kind: 'error', error: 'failed' },
+  'unknown code reads as failed',
+);
+eq(afterPoll(null, 'a', 20000, 'requested'), { kind: 'reoffer' }, 'still waking: offer again');
+eq(
+  afterPoll(null, 'a', 20000, 'awake'),
+  { kind: 'error', error: 'timeout' },
+  'awake but silent',
+);
+eq(
+  ['idle', 'done', 'awake', 'requested', undefined].map(needsWake),
+  [true, true, false, false, true],
+  'when watching also wakes',
+);
+eq(/^[0-9a-f]{32}$/.test(newId()) && newId() !== newId(), true, 'offer ids are 32 hex and differ');
+eq(
+  SCREEN_MESSAGES.permission,
+  'MacWake needs Screen Recording permission on the Mac (System Settings → Privacy & Security → Screen Recording).',
+  'same text as the web console',
 );
 
 // Derived view
@@ -170,6 +215,10 @@ const srv = http
       res.end('<!doctype html><p>Parked domain</p>');
       return;
     }
+    if (inc.url === '/api/screen') {
+      res.end('{"ice":[],"push":null,"offer":null,"answer":null}');
+      return;
+    }
     let body = '';
     inc.on('data', c => (body += c));
     inc.on('end', () =>
@@ -218,6 +267,16 @@ eq(
   await fail(api({ url, token: TOK }, 'page')),
   [0, "That address isn't a MacWake console."],
   '200 from a non-console is an error, not a crash',
+);
+eq(
+  await request({ url, token: TOK }, 'screen'),
+  { ice: [], push: null, offer: null, answer: null },
+  'request returns any console JSON',
+);
+eq(
+  await fail(api({ url, token: TOK }, 'screen')),
+  [0, "That address isn't a MacWake console."],
+  'api still insists on a state',
 );
 srv.close();
 eq(

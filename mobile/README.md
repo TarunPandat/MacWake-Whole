@@ -81,3 +81,9 @@ A paid Apple Developer account (99 USD a year) lasts a year and allows TestFligh
 
 If the bundle ID `io.macwake.mobile` is taken under your team, change it in Xcode under
 **Signing & Capabilities**.
+
+## Watch screen
+
+"Watch screen" opens a full-screen live view of the Mac (view-only; pinch to zoom on iOS). It uses
+`react-native-webrtc` (pinned 124.0.8); after installing or updating it run `cd ios && LANG=en_US.UTF-8 pod install`
+and restart Metro. Decisions and text live in `src/core.ts` and mirror `console-next/lib/screen.js`.

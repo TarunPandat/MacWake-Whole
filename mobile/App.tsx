@@ -51,6 +51,8 @@ import {
 
 // The camera only loads when someone taps "Scan pairing code".
 const Scanner = React.lazy(() => import('./src/Scanner'));
+// WebRTC only loads when someone taps "Watch screen".
+const Viewer = React.lazy(() => import('./src/Viewer'));
 
 // Night at home: indigo dark, always. One loud element: the sleep light. (globals.css dark tokens.)
 const c = {
@@ -221,6 +223,7 @@ function Console({
   const [busy, setBusy] = useState(false);
   const [pulling, setPulling] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
+  const [watching, setWatching] = useState(false);
   const [, tick] = useState(0);
   const latest = useRef(0);
   const mutating = useRef(0);
@@ -326,6 +329,13 @@ function Console({
             disabled={busy || primary.disabled}
             onPress={() => primary.action && act(primary.action)}
           />
+          <Primary
+            label="Watch screen"
+            quiet
+            style={s.watch}
+            disabled={view.phase === 'never' || view.phase === 'loading'}
+            onPress={() => setWatching(true)}
+          />
         </>
       }
     >
@@ -359,6 +369,18 @@ function Console({
       {view.note ? <Text style={s.note}>{view.note}</Text> : null}
 
       <Timing form={form} setForm={setForm} busy={busy} onSave={save} />
+
+      {watching && (
+        <Suspense fallback={null}>
+          <Viewer
+            session={session}
+            onClose={() => {
+              setWatching(false);
+              call('state');
+            }}
+          />
+        </Suspense>
+      )}
 
       {err ? (
         <Text
@@ -1005,6 +1027,7 @@ const s = StyleSheet.create({
 
   // The thumb zone.
   dock: { paddingTop: 28 },
+  watch: { marginTop: 10 },
   primary: {
     width: '100%',
     borderRadius: 999,
