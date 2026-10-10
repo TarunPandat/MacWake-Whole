@@ -422,7 +422,10 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         screen = s
     }
 
-    @objc func toggleViewing() { screenAllowed.toggle() }
+    @objc func toggleViewing() {
+        screenAllowed.toggle()
+        if !screenAllowed { screen?.endSession() }
+    }
 
     func rebuild() {
         menu.removeAllItems()
