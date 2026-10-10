@@ -1,12 +1,14 @@
-// MacWake admin console. Cloudflare Worker + KV. One shared bearer token for phone and Mac.
-// KV keys, each with a single writer so eventually-consistent KV never loses an update:
+// MacWake admin console. Cloudflare Worker + KV. Each Mac's own token is its account, shared with its phone.
+// KV keys live under mac:<sha256(token)>: (pre-multi-Mac consoles keep their one Mac under bare keys),
+// each with a single writer so eventually-consistent KV never loses an update:
+//   reg      "1" once the Mac app registered
 //   cmd      {seq, action:'wake'|'idle', at}            written by console
 //   device   {lastSeen, ac, battery, host, holding, ackSeq} written by the Mac
 //   settings {interval, hold}                           written by console
 
 const DEFAULTS = { interval: 5, hold: 30 }; // minutes
 
-// Pairing (trust on first use), same as console-next/lib/logic.js: the Mac app registers a random token once.
+// Pairing, same as console-next/lib/logic.js: every Mac app registers its own random token.
 const hex = async s => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, "0")).join("");
 async function same(a, b) {   // constant-time: compares fixed-length digests
   const [x, y] = await Promise.all([hex(a), hex(b)]);
@@ -15,20 +17,44 @@ async function same(a, b) {   // constant-time: compares fixed-length digests
 }
 const bearer = request => { const h = request.headers.get("Authorization") || ""; return h.startsWith("Bearer ") ? h.slice(7).trim() : ""; };
 
-async function authed(request, env) {
-  const given = bearer(request);
-  if (!given) return false;
+const scoped = (kv, prefix) => ({ get: (k, t) => kv.get(prefix + k, t), put: (k, v) => kv.put(prefix + k, v) });
+async function legacy(given, env) {   // the one Mac of a pre-multi-Mac console, or ADMIN_TOKEN
   if (env.ADMIN_TOKEN && await same(given, env.ADMIN_TOKEN)) return true;
   const owner = await env.STATE.get("owner");
   return !!owner && await same(await hex(given), owner);
 }
 
-async function register(request, env) {
+/** The KV a bearer token opens, scoped to its Mac, or null. */
+async function account(request, env) {
   const given = bearer(request);
-  if (given.length < 32) return json({ error: "token must be at least 32 characters" }, 400);
-  const owner = await env.STATE.get("owner"), mine = await hex(given);
-  if (!owner) { await env.STATE.put("owner", mine); return json({ paired: true }, 201); }
-  return await same(mine, owner) ? json({ paired: true }) : json({ error: "console already paired with another Mac" }, 409);
+  if (!given) return null;
+  const mine = await hex(given);
+  if (await env.STATE.get(`mac:${mine}:reg`)) return scoped(env.STATE, `mac:${mine}:`);
+  return await legacy(given, env) ? env.STATE : null;
+}
+
+const PAIRED = () => json({ paired: true }), TAKEN = () => json({ error: "this token belongs to another Mac" }, 409);
+/** A token belongs to the first Mac that registers it with its id; another Mac using it is sent off to make its own. */
+async function claim(env, key, machine, current) {
+  if (!machine || current === machine) return PAIRED();
+  if (current && current !== "1") return TAKEN();   // "1": registered by an app that didn't send its id yet
+  await env.STATE.put(key, machine);
+  return PAIRED();
+}
+
+async function register(request, env) {
+  // Optional [[ratelimits]] binding (wrangler.toml): pairing is open, and each new Mac costs a KV write.
+  if (env.REGISTER_LIMIT && !(await env.REGISTER_LIMIT.limit({ key: request.headers.get("CF-Connecting-IP") || "?" })).success)
+    return json({ error: "too many pairings, try again in a minute" }, 429);
+  const given = bearer(request), body = (await request.json().catch(() => null)) || {};
+  const machine = /^[0-9a-f]{64}$/.test(body.mac || "") ? body.mac : "";
+  // The pre-multi-Mac shared token (or ADMIN_TOKEN) may be pasted on several Macs: each one makes its own.
+  if (given && await legacy(given, env)) return TAKEN();
+  if (!/^[0-9a-f]{32,128}$/i.test(given)) return json({ error: "token must be 32 to 128 hex characters" }, 400);
+  const key = `mac:${await hex(given)}:reg`, current = await env.STATE.get(key);
+  if (current) return claim(env, key, machine, current);
+  await env.STATE.put(key, machine || "1");
+  return json({ paired: true }, 201);
 }
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json" } });
@@ -43,52 +69,58 @@ async function state(kv) {
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/") return new Response(PAGE, { headers: { "Content-Type": "text/html;charset=utf-8" } });
-    if (!url.pathname.startsWith("/api/")) return new Response("not found", { status: 404 });
-    if (url.pathname === "/api/register" && request.method === "POST") return register(request, env);
-    if (!(await authed(request, env))) return json({ error: "unauthorized" }, 401);
-    const kv = env.STATE, now = Date.now();
-    const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
-
-    switch (url.pathname) {
-      case "/api/state":
-        return json(await state(kv));
-
-      case "/api/wake":
-      case "/api/cancel": {
-        const cmd = await get(kv, "cmd", { seq: 0 });
-        await kv.put("cmd", JSON.stringify({ seq: cmd.seq + 1, action: url.pathname === "/api/wake" ? "wake" : "idle", at: now }));
-        return json(await state(kv));
-      }
-
-      case "/api/settings": {
-        const cur = await get(kv, "settings", DEFAULTS);
-        const clamp = (v, lo, hi, d) => Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d;
-        const next = { interval: clamp(body.interval, 1, 240, cur.interval), hold: clamp(body.hold, 1, 1440, cur.hold) };
-        await kv.put("settings", JSON.stringify(next));
-        return json(await state(kv));
-      }
-
-      case "/api/heartbeat": {
-        // Mac calls this on every wake and every ~60s while awake.
-        const [cmd, device, settings] = await Promise.all([
-          kv.get("cmd", { type: "json", cacheTtl: 30 }).then(v => v || { seq: 0, action: "idle" }),   // shortest allowed cache: wake requests propagate faster
-          get(kv, "device", {}), get(kv, "settings", DEFAULTS)]);
-        // Deliver once per request; re-deliver if the Mac dropped the hold (e.g. rebooted) while the hold window is still open.
-        const acked = (device.ackSeq || 0) >= cmd.seq;
-        const wake = cmd.action === "wake" && (!acked || (!body.holding && now - (device.ackAt || 0) < settings.hold * 60e3));
-        // The Mac reports `holding` as of before this reply; if we tell it to wake now, it will be holding.
-        const next = { lastSeen: now, ac: !!body.ac, battery: body.battery ?? null, host: body.host || "", lid: !!body.lid, holding: wake || !!body.holding, ackSeq: wake ? cmd.seq : device.ackSeq || 0, ackAt: wake ? now : device.ackAt || 0 };
-        // ponytail: KV free tier allows 1000 writes/day, so only persist when something changed or 5 min passed.
-        const changed = ["ac", "lid", "holding", "ackSeq", "host"].some(k => next[k] !== device[k]) || now - (device.lastSeen || 0) > 5 * 60e3;
-        if (changed) await kv.put("device", JSON.stringify(next));
-        return json({ wake, hold: cmd.action === "wake", interval: settings.interval, holdMinutes: settings.hold });
-      }
-    }
-    return json({ error: "not found" }, 404);
+    try { return await route(request, env); }
+    // e.g. the KV free tier's daily write limit: answer in JSON so the Mac and phone show a readable error.
+    catch (e) { return json({ error: e.message || "server error" }, 503); }
   },
 };
+
+async function route(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname === "/") return new Response(PAGE, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+  if (!url.pathname.startsWith("/api/")) return new Response("not found", { status: 404 });
+  if (url.pathname === "/api/register" && request.method === "POST") return register(request, env);
+  const kv = await account(request, env), now = Date.now();
+  if (!kv) return json({ error: "unauthorized" }, 401);
+  const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
+
+  switch (url.pathname) {
+    case "/api/state":
+      return json(await state(kv));
+
+    case "/api/wake":
+    case "/api/cancel": {
+      const cmd = await get(kv, "cmd", { seq: 0 });
+      await kv.put("cmd", JSON.stringify({ seq: cmd.seq + 1, action: url.pathname === "/api/wake" ? "wake" : "idle", at: now }));
+      return json(await state(kv));
+    }
+
+    case "/api/settings": {
+      const cur = await get(kv, "settings", DEFAULTS);
+      const clamp = (v, lo, hi, d) => Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d;
+      const next = { interval: clamp(body.interval, 1, 240, cur.interval), hold: clamp(body.hold, 1, 1440, cur.hold) };
+      await kv.put("settings", JSON.stringify(next));
+      return json(await state(kv));
+    }
+
+    case "/api/heartbeat": {
+      // Mac calls this on every wake and every ~60s while awake.
+      const [cmd, device, settings] = await Promise.all([
+        kv.get("cmd", { type: "json", cacheTtl: 30 }).then(v => v || { seq: 0, action: "idle" }),   // shortest allowed cache: wake requests propagate faster
+        get(kv, "device", {}), get(kv, "settings", DEFAULTS)]);
+      // Deliver once per request; re-deliver if the Mac dropped the hold (e.g. rebooted) while the hold window is still open.
+      const acked = (device.ackSeq || 0) >= cmd.seq;
+      const wake = cmd.action === "wake" && (!acked || (!body.holding && now - (device.ackAt || 0) < settings.hold * 60e3));
+      // The Mac reports `holding` as of before this reply; if we tell it to wake now, it will be holding.
+      const next = { lastSeen: now, ac: !!body.ac, battery: body.battery ?? null, host: body.host || "", lid: !!body.lid, holding: wake || !!body.holding, ackSeq: wake ? cmd.seq : device.ackSeq || 0, ackAt: wake ? now : device.ackAt || 0 };
+      // ponytail: KV free tier allows 1000 writes/day, so only persist when something changed or 5 min passed.
+      const changed = ["ac", "lid", "holding", "ackSeq", "host"].some(k => next[k] !== device[k]) || now - (device.lastSeen || 0) > 5 * 60e3;
+      if (changed) await kv.put("device", JSON.stringify(next));
+      return json({ wake, hold: cmd.action === "wake", interval: settings.interval, holdMinutes: settings.hold });
+    }
+  }
+  return json({ error: "not found" }, 404);
+}
 
 const PAGE = `<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
 <title>MacWake</title><link rel=icon href="data:,">
@@ -106,7 +138,7 @@ input{width:100%;font-size:17px;padding:10px;border-radius:10px;border:1px solid
 small{color:var(--mut)}#err{color:#ff453a}
 </style></head><body>
 <h1>MacWake</h1>
-<div class=card id=login><label>Admin token<input id=tok type=password autocomplete=current-password></label><button onclick="saveTok()">Sign in</button></div>
+<div class=card id=login><label>Token<input id=tok type=password autocomplete=current-password></label><button onclick="saveTok()">Sign in</button></div>
 <div id=app hidden>
 <div class=card>
  <div style="font-size:20px;margin-bottom:8px"><span class=dot id=dot></span><b id=phase>…</b></div>
@@ -126,6 +158,8 @@ small{color:var(--mut)}#err{color:#ff453a}
 </div>
 <script>
 const $=id=>document.getElementById(id);let tok=localStorage.getItem('tok');
+// The Mac's pairing QR and Open console pass its token in the URL fragment (never sent to the server).
+const m=location.hash.match(/token=([0-9a-f]{32,})/i);if(m){tok=m[1];localStorage.setItem('tok',tok);history.replaceState(null,'',location.pathname)}
 function saveTok(){tok=$('tok').value.trim();localStorage.setItem('tok',tok);boot()}
 async function api(p,b){const r=await fetch(p,{method:b?'POST':'GET',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
  if(r.status===401){localStorage.removeItem('tok');location.reload()}if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}

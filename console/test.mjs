@@ -31,3 +31,22 @@ mem.set("device", JSON.stringify({ ...JSON.parse(mem.get("device")), holding: fa
 [, s] = await j(await call("/api/settings", { interval: 999, hold: "x" })); eq(s.settings, { interval: 240, hold: 30 }, "settings clamp");
 [, hb] = await j(await call("/api/heartbeat", { host: "mbp" })); eq([hb.interval, hb.holdMinutes], [240, 30], "settings reach mac");
 console.log("ok");
+
+// Every Mac pairs on its own and only sees its own state.
+const reg = (t, mac) => worker.fetch(new Request("https://x/api/register", { method: "POST", headers: { Authorization: "Bearer " + t }, body: mac && JSON.stringify({ mac }) }), env);
+const A = "a".repeat(48), B = "b".repeat(48);
+eq([(await reg(A)).status, (await reg(A)).status, (await reg(B)).status, (await reg("short")).status], [201, 200, 201, 400], "each Mac registers");
+eq((await call("/api/state", null, "f".repeat(48))).status, 401, "unregistered token rejected");
+await call("/api/wake", {}, A);
+eq([(await j(await call("/api/state", null, A)))[1].phase, (await j(await call("/api/state", null, B)))[1].phase], ["requested", "idle"], "Macs are separate");
+eq([(await reg(B, "2".repeat(64))).status, (await reg(B, "3".repeat(64))).status], [200, 409], "a copied token is refused on another Mac");
+eq((await reg("s3cret", "2".repeat(64))).status, 409, "ADMIN_TOKEN is never a Mac's own token");
+mem.set("owner", await (async s => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, "0")).join(""))("c".repeat(48)));
+eq([(await reg("c".repeat(48))).status, (await call("/api/state", null, "c".repeat(48))).status], [409, 200], "old shared token: still opens its Mac, but setting up again makes a new one");
+const broken = { ...env, STATE: { ...env.STATE, put: async () => { throw new Error("KV put() limit exceeded for the day."); } } };
+const r = await worker.fetch(new Request("https://x/api/wake", { method: "POST", headers: { Authorization: "Bearer " + A }, body: "{}" }), broken);
+eq([r.status, (await r.json()).error], [503, "KV put() limit exceeded for the day."], "store errors come back as JSON");
+let n = 0; const limited = { ...env, REGISTER_LIMIT: { limit: async () => ({ success: ++n <= 1 }) } };
+eq([(await worker.fetch(new Request("https://x/api/register", { method: "POST", headers: { Authorization: "Bearer " + "d".repeat(48) } }), limited)).status,
+    (await worker.fetch(new Request("https://x/api/register", { method: "POST", headers: { Authorization: "Bearer " + "e".repeat(48) } }), limited)).status], [201, 429], "pairing is rate limited");
+console.log("multi-Mac ok");

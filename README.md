@@ -39,15 +39,9 @@ Needs Node 22+ (`brew install node` or nodejs.org) and a free Cloudflare account
 sh console/deploy.sh
 ```
 
-It logs you into Cloudflare in the browser, creates the KV namespace, generates an admin
-token, deploys, and prints:
-
-```
-https://macwake.<you>.workers.dev
-ADMIN TOKEN: ...
-```
-
-Open that URL on your phone, paste the token, add it to your home screen.
+It logs you into Cloudflare in the browser, creates the KV namespace, deploys, and prints
+the console URL (`https://macwake.<you>.workers.dev`). There is no admin token to copy: each
+Mac pairs itself in step 2 and shows a QR code for its phone.
 
 Prefer Next.js / Vercel? Use `console-next/` instead; see [console-next/README.md](console-next/README.md). The Mac app works with either.
 
@@ -64,8 +58,8 @@ CONSOLE_URL=https://your-console.vercel.app sh mac/build.sh    # -> mac/dist/Mac
 Open the DMG, drag **MacWake** to Applications, and open it from Applications. It refuses
 to set up from the DMG or from `mac/dist`. On first run it:
 
-1. Creates its own random token and pairs it with the console. The first Mac to pair owns
-   the console. To pair a different Mac later, delete the `owner` key in the store.
+1. Creates its own random token and pairs it with the console. Every Mac does this, so one
+   console serves any number of Macs, and each phone only sees the Mac it paired with.
 2. Asks for your Mac password once, to install the background service. That is a root
    LaunchDaemon with its own copy of the binary, so moving the app later does not break it.
 3. Shows **Pair your phone**: a QR code that opens the console already signed in, plus the
@@ -106,9 +100,9 @@ The Mac stays awake for the configured hold time (default 30 min) or until you t
   a few minutes), then sleeps until the next timer. Check the log.
 - **Hibernate**: leave `hibernatemode` at the default 3. The RTC alarm also wakes from
   hibernation, but restoring from the disk image makes every check-in much slower.
-- **One shared token** protects the console and the API. Treat it like a password.
-- Cloudflare free tier allows 1000 KV writes/day; the Mac only writes on change or every
-  5 min, so it fits. Reads are effectively unlimited.
+- **Each Mac's token** protects that Mac on the console and the API. Treat it like a password.
+- Cloudflare free tier allows 1000 KV writes/day; each Mac only writes on change or every
+  5 min (about 300/day), so it fits about three Macs. For more, use `console-next/`.
 
 ## Uninstall
 

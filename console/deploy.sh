@@ -8,11 +8,10 @@ if grep -q REPLACE_WITH_KV_ID wrangler.toml; then
   [ -n "$ID" ] || { echo "could not read KV id, run: npx wrangler kv namespace create STATE"; exit 1; }
   sed -i '' "s/REPLACE_WITH_KV_ID/$ID/" wrangler.toml
 fi
-# Set the token only on first deploy or when ADMIN_TOKEN is given; re-running must not rotate it.
-if [ -n "$ADMIN_TOKEN" ] || ! npx -y wrangler@4 secret list 2>/dev/null | grep -q ADMIN_TOKEN; then
-  TOKEN=${ADMIN_TOKEN:-$(openssl rand -hex 24)}
-  printf '%s' "$TOKEN" | npx -y wrangler@4 secret put ADMIN_TOKEN
-fi
+# Each Mac pairs itself with its own token. ADMIN_TOKEN is only for consoles set up before that:
+# ADMIN_TOKEN=... sh deploy.sh keeps their one Mac reachable with the old shared token.
+if [ -n "$ADMIN_TOKEN" ]; then printf '%s' "$ADMIN_TOKEN" | npx -y wrangler@4 secret put ADMIN_TOKEN; fi
 npx -y wrangler@4 deploy
 echo
-[ -n "$TOKEN" ] && echo "ADMIN TOKEN (save it, paste into phone console and Mac app): $TOKEN" || echo "ADMIN_TOKEN unchanged (export ADMIN_TOKEN=... to set a new one)"
+echo "Next: build the Mac app with CONSOLE_URL set to the workers.dev URL above (sh mac/build.sh) and install it."
+echo "Every Mac pairs itself and shows a QR code for its phone."

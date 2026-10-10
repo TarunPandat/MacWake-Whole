@@ -282,11 +282,15 @@ final class Daemon {
 // MARK: - Menu bar app
 
 /// HTTP call that blocks the caller; fine for the few one-off requests the menu-bar app makes.
-func request(_ method: String, _ url: String, token: String, timeout: TimeInterval = 10) -> (status: Int, error: String?) {
+func request(_ method: String, _ url: String, token: String, body: [String: Any]? = nil, timeout: TimeInterval = 10) -> (status: Int, error: String?) {
     guard let u = URL(string: url) else { return (0, "invalid URL") }
     var req = URLRequest(url: u, timeoutInterval: timeout)
     req.httpMethod = method
     req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+    if let body {
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+    }
     var out: (Int, String?) = (0, "no response")
     let sem = DispatchSemaphore(value: 0)
     URLSession.shared.dataTask(with: req) { _, resp, err in
@@ -315,6 +319,15 @@ enum Token {
 }
 
 extension String { var nilIfEmpty: String? { isEmpty ? nil : self } }
+
+/// Anonymous, stable id of this Mac (hash of its hardware UUID), so the console can tell two Macs sharing a token apart.
+func machineID() -> String {
+    let svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+    defer { IOObjectRelease(svc) }
+    let uuid = IORegistryEntryCreateCFProperty(svc, "IOPlatformUUID" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String ?? ""
+    if uuid.isEmpty { return "" }   // the console then skips the check
+    return SHA256.hash(data: Data("macwake:\(uuid)".utf8)).map { String(format: "%02x", $0) }.joined()
+}
 
 func qrImage(_ text: String, size: CGFloat) -> NSImage? {
     guard let f = CIFilter(name: "CIQRCodeGenerator") else { return nil }
@@ -356,6 +369,22 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         else if CommandLine.arguments.contains("--pair") { DispatchQueue.main.async { self.showPairing() } }
         // A newer app than the installed background service: reinstall it (same token, asks for the password once).
         else if !FileManager.default.contentsEqual(atPath: Bundle.main.executablePath!, andPath: supportDir + "/MacWake") { DispatchQueue.main.async { self.setup() } }
+        else { checkPairing() }
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.checkPairing() }
+    }
+
+    /// The console may stop accepting a token this Mac shares with another (e.g. pasted into an older version,
+    /// before the console was updated). Asks in the background; on refusal, pairs again with a token of its own.
+    func checkPairing() {
+        guard installed, let token = Token.load(), !consoleURL.isEmpty else { return }
+        let url = consoleURL
+        DispatchQueue.global().async {
+            guard [400, 409].contains(request("POST", url + "/api/register", token: token, body: ["mac": machineID()]).status) else { return }
+            DispatchQueue.main.async {
+                self.alert("Pair this Mac again", "This Mac shares its token with another Mac. MacWake will give it its own and ask for your password, then show a new code for your phone.")
+                self.setup()
+            }
+        }
     }
 
     func menuWillOpen(_ menu: NSMenu) { rebuild() }
@@ -414,18 +443,28 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let u = prompt("Where is your MacWake console?", "Enter the web address of the console you deployed.", placeholder: "https://your-console.vercel.app") else { return }
             consoleURL = normalized(u)
         }
+        if installed && Token.load() == nil {
+            let a = NSAlert(); a.messageText = "MacWake is already set up on this Mac"
+            a.informativeText = "Another user on this Mac set it up. Set it up for you instead? The phone paired by the other user will need to pair again."
+            a.addButton(withTitle: "Set up for me"); a.addButton(withTitle: "Cancel")
+            NSApp.activate(ignoringOtherApps: true)
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
         guard let token = pair() else { return }
-        Token.save(token)
         let r = runAdmin(App.installScript(Config(url: consoleURL, token: token), exe: Bundle.main.executablePath!))
         guard r.ok else { alert("MacWake couldn't install its background service", r.out); return }
+        Token.save(token)   // only now: the QR code and Copy token must match what the background service uses
         rebuild()
         showPairing()
     }
 
-    /// Returns a token the console accepts: this Mac's own (registered on first run) or one the user pastes.
+    /// Registers this Mac's own token with the console (each Mac is its own account) and returns it.
     func pair() -> String? {
-        let token = Token.load() ?? Token.generate()
-        let r = request("POST", consoleURL + "/api/register", token: token)
+        var token = Token.load() ?? Token.generate()
+        let register = { request("POST", self.consoleURL + "/api/register", token: $0, body: ["mac": machineID()]) }
+        var r = register(token)
+        // The saved token isn't this Mac's own (pasted into an older version, or copied from another Mac): make one.
+        if [400, 409].contains(r.status), Token.load() != nil { token = Token.generate(); r = register(token) }
         switch r.status {
         case 200, 201: return token
         case 500...599:
@@ -434,13 +473,12 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case 0:
             alert("MacWake can't reach the console", "\(consoleURL) did not answer (\(r.error ?? "no response")). Check the address with Change console URL…, and that this Mac is online.")
             return nil
+        case 429:
+            alert("Too many Macs are pairing from this network", "Wait a minute, then choose Set up… again.")
+            return nil
         default:
-            // 409: the console is already paired with another token. 404/405: older console without pairing.
-            let why = r.status == 409 ? "This console is already paired with a different token." : "This console doesn't support automatic pairing."
-            guard let pasted = prompt("Enter the console's token", "\(why) Paste the token you used before, or the ADMIN_TOKEN set on the server.", placeholder: "token", secure: true, ok: "Use token") else { return nil }
-            let check = request("GET", consoleURL + "/api/state", token: pasted)
-            if check.status == 200 { return pasted }
-            alert("The console didn't accept that token", "It answered with status \(check.status). Check the token and try Set up… again.")
+            // 409/404/405: a console from before every Mac could pair on its own.
+            alert("This console can't pair another Mac", "\(consoleURL) answered with status \(r.status). Update the console to the latest version, then choose Set up… again.")
             return nil
         }
     }
@@ -535,14 +573,17 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 // MARK: - Entry
 
-// Terminal install, bypasses the setup dialog:  sudo /Applications/MacWake.app/Contents/MacOS/MacWake --install <url> <token>
+// Terminal install, bypasses the setup dialog:  sudo /Applications/MacWake.app/Contents/MacOS/MacWake --install <url> [token]
 if let i = CommandLine.arguments.firstIndex(of: "--install") {
     let args = Array(CommandLine.arguments.dropFirst(i + 1))
-    guard args.count == 2, args[0].hasPrefix("http") else { print("usage: sudo MacWake --install <console-url> <admin-token>"); exit(2) }
+    guard (1...2).contains(args.count), args[0].hasPrefix("http") else { print("usage: sudo MacWake --install <console-url> [token]"); exit(2) }
     guard getuid() == 0 else { print("run with sudo"); exit(1) }
     var u = args[0]; while u.hasSuffix("/") { u.removeLast() }
-    let r = sh(App.installScript(Config(url: u, token: args[1]), exe: Bundle.main.executablePath!))
-    print(r.status == 0 ? "installed: service io.macwake.daemon is running, log at \(logPath)" : "install failed:\n\(r.out)")
+    let token = args.count == 2 ? args[1] : Token.generate()
+    let reg = request("POST", u + "/api/register", token: token, body: ["mac": machineID()])
+    guard [200, 201].contains(reg.status) else { print("the console refused this token: status \(reg.status) \(reg.error ?? "")"); exit(1) }
+    let r = sh(App.installScript(Config(url: u, token: token), exe: Bundle.main.executablePath!))
+    print(r.status == 0 ? "installed: service io.macwake.daemon is running, log at \(logPath)\npair your phone with this token: \(token)" : "install failed:\n\(r.out)")
     exit(r.status)
 }
 
