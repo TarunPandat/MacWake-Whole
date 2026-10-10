@@ -10,6 +10,7 @@ import IOKit.pwr_mgt
 import CoreImage
 import Security
 import CryptoKit
+import ServiceManagement
 
 let label = "io.macwake.daemon"
 // powerd (AutoWakeScheduler.c, wakeTimerExpiredCallout): an owner containing "com.apple.alarm"
@@ -358,6 +359,8 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         get { UserDefaults.standard.object(forKey: "screenViewing") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "screenViewing") }
     }
+    /// Set while "New token" runs setup, so pairing makes a fresh token instead of reusing the saved one.
+    var renewing = false
     /// Console URL baked in at build time (build.sh CONSOLE_URL=...), unless the user picked another one.
     var consoleURL: String {
         get { UserDefaults.standard.string(forKey: "url") ?? (Bundle.main.object(forInfoDictionaryKey: "MacWakeConsoleURL") as? String) ?? "" }
@@ -437,6 +440,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             add("Copy token", #selector(copyToken))
             add("Open console", #selector(openConsole))
             add("Allow screen viewing", #selector(toggleViewing)).state = screenAllowed ? .on : .off
+            add("New token (unpair all phones)…", #selector(newToken))
         } else {
             add("Set up…", #selector(setup))
         }
@@ -482,7 +486,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let u = prompt("Where is your MacWake console?", "Enter the web address of the console you deployed.", placeholder: "https://your-console.vercel.app") else { return }
             consoleURL = normalized(u)
         }
-        if installed && Token.load() == nil {
+        if installed && Token.load() == nil && !renewing {
             let a = NSAlert(); a.messageText = "MacWake is already set up on this Mac"
             a.informativeText = "Another user on this Mac set it up. Set it up for you instead? The phone paired by the other user will need to pair again."
             a.addButton(withTitle: "Set up for me"); a.addButton(withTitle: "Cancel")
@@ -493,14 +497,34 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let r = runAdmin(App.installScript(Config(url: consoleURL, token: token), exe: Bundle.main.executablePath!))
         guard r.ok else { alert("MacWake couldn't install its background service", r.out); return }
         Token.save(token)   // only now: the QR code and Copy token must match what the background service uses
+        _ = CGRequestScreenCaptureAccess()      // once: macOS asks to allow Screen Recording, for live screen viewing
+        try? SMAppService.mainApp.register()    // start at login, so viewers can connect after a restart
+        let restart = screen != nil && (screen?.token != token || screen?.url != consoleURL)
         if screen == nil { startScreen(url: consoleURL, token: token) }
         rebuild()
         showPairing()
+        if restart { relaunch() }   // the push listener is bound to the old token's topic
+    }
+
+    func relaunch() {
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/open"); p.arguments = ["-n", Bundle.main.bundlePath]
+        try? p.run()
+        NSApp.terminate(nil)
+    }
+
+    /// The token opens the screen too: a fresh one locks out every phone and browser that had the old one.
+    @objc func newToken() {
+        let a = NSAlert(); a.messageText = "Unpair all phones?"
+        a.informativeText = "Every phone and browser signed in to this Mac stops working and needs the new pairing code. MacWake will ask for your password."
+        a.addButton(withTitle: "New token"); a.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        renewing = true; setup(); renewing = false
     }
 
     /// Registers this Mac's own token with the console (each Mac is its own account) and returns it.
     func pair() -> String? {
-        var token = Token.load() ?? Token.generate()
+        var token = renewing ? Token.generate() : (Token.load() ?? Token.generate())
         let register = { request("POST", self.consoleURL + "/api/register", token: $0, body: ["mac": machineID()]) }
         var r = register(token)
         // The saved token isn't this Mac's own (pasted into an older version, or copied from another Mac): make one.

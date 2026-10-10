@@ -55,6 +55,9 @@ Build with your console's address baked in, so the app needs no typing:
 CONSOLE_URL=https://your-console.vercel.app sh mac/build.sh    # -> mac/dist/MacWake.dmg
 ```
 
+Building it yourself? Run `sh tools/make-signing-cert.sh` once first. It creates a free local signing certificate, so
+macOS keeps MacWake's Screen Recording permission when you rebuild or update.
+
 Open the DMG, drag **MacWake** to Applications, and open it from Applications. It refuses
 to set up from the DMG or from `mac/dist`. On first run it:
 
@@ -83,6 +86,21 @@ Menu bar → **Sleep now**. On your phone, tap **Wake up Mac**. The console show
 The Mac stays awake for the configured hold time (default 30 min) or until you tap
 **Cancel / let it sleep**. Log: `/Library/Logs/MacWake.log` (menu bar → Show log).
 
+## Watch the screen
+
+Tap **Watch screen** in the console or the app to see your Mac's screen live (view-only for now). It wakes the Mac
+if needed and connects on its own; the Mac shows an eye in its menu bar and macOS's own recording indicator while
+someone watches. Video goes straight from the Mac to your phone, encrypted; the console only passes the connection
+setup along.
+
+- MacWake's menu-bar app must be running (it starts at login) and someone must be logged in on the Mac.
+- Allow Screen Recording once when setup asks (System Settings → Privacy & Security → Screen Recording).
+- After a wake the Mac usually shows its lock screen; you'll see it, but view-only can't unlock it.
+- Lid closed without an external display means there's no screen to show.
+- Turn it off on the Mac with **Allow screen viewing** in the menu. **New token (unpair all phones)…** locks out
+  every phone and browser that had the old token.
+- Some cellular networks block direct connections; add a free TURN relay to the console (see console-next/README.md).
+
 ## Settings (in the console)
 
 - **Check-in interval**: how often the Mac wakes to ask. Shorter = faster wake, more wakes.
@@ -100,7 +118,8 @@ The Mac stays awake for the configured hold time (default 30 min) or until you t
   a few minutes), then sleeps until the next timer. Check the log.
 - **Hibernate**: leave `hibernatemode` at the default 3. The RTC alarm also wakes from
   hibernation, but restoring from the disk image makes every check-in much slower.
-- **Each Mac's token** protects that Mac on the console and the API. Treat it like a password.
+- **Each Mac's token** protects that Mac on the console and the API, and now also opens its screen. Treat it like a
+  password; use **New token (unpair all phones)…** if it leaks.
 - Cloudflare free tier allows 1000 KV writes/day; each Mac only writes on change or every
   5 min (about 300/day), so it fits about three Macs. For more, use `console-next/`.
 
