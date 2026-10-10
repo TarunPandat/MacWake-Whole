@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 APP=dist/MacWake.app
 rm -rf dist && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 for arch in arm64 x86_64; do
-  swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" -framework AppKit -framework IOKit Sources/main.swift -o "dist/MacWake-$arch"
+  swiftc -O -swift-version 5 -target "$arch-apple-macos13.0" -framework AppKit -framework IOKit Sources/*.swift -o "dist/MacWake-$arch"
 done
 lipo -create dist/MacWake-arm64 dist/MacWake-x86_64 -output "$APP/Contents/MacOS/MacWake" && rm dist/MacWake-*
 cp Info.plist "$APP/Contents/Info.plist"

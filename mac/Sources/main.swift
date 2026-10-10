@@ -67,6 +67,39 @@ func lidClosed() -> Bool { rootDomainFlag("AppleClamshellState") }
 /// Lid closed and nothing (external display) keeps the Mac running in clamshell mode.
 func lidWouldSleep() -> Bool { lidClosed() && rootDomainFlag("AppleClamshellCausesSleep") }
 
+/// ntfy topic for a token: unguessable without it. The console's topicFor() computes the same name.
+func pushTopic(_ token: String) -> String {
+    "macwake-" + SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined().prefix(40)
+}
+
+/// Long-lived stream from the push relay (ntfy) on its own thread; each message calls `onMessage` on that thread.
+/// `server` is read before every connection, so the console can switch relays; nil means wait.
+func listenForPushes(topic: String, server: @escaping () -> String?, onMessage: @escaping () -> Void) {
+    Thread.detachNewThread {
+        while true {
+            guard let server = server() else { Thread.sleep(forTimeInterval: 5); continue }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+            p.arguments = ["-sN", "--max-time", "3600", "\(server)/\(topic)/raw"]
+            let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { Thread.sleep(forTimeInterval: 10); continue }
+            var buf = Data()
+            while true {
+                let chunk = out.fileHandleForReading.availableData
+                if chunk.isEmpty { break }
+                buf.append(chunk)
+                while let nl = buf.firstIndex(of: 10) {
+                    let line = buf[buf.startIndex..<nl]; buf.removeSubrange(buf.startIndex...nl)
+                    // ntfy sends empty lines as keepalives
+                    if line.contains(where: { $0 != 32 && $0 != 13 }) { onMessage() }
+                }
+            }
+            p.waitUntilExit()
+            Thread.sleep(forTimeInterval: 3)
+        }
+    }
+}
+
 // MARK: - Daemon
 
 final class Daemon {
@@ -84,7 +117,7 @@ final class Daemon {
     let pushLock = NSLock()
     var pushServer: String?
     var poked = false
-    lazy var topic = "macwake-" + SHA256.hash(data: Data(cfg.token.utf8)).map { String(format: "%02x", $0) }.joined().prefix(40)
+    lazy var topic = pushTopic(cfg.token)
 
     init(cfg: Config) {
         var c = cfg
@@ -110,31 +143,10 @@ final class Daemon {
         listenIDs = listening ? Daemon.keepAwake.map { assertion($0, "MacWake listening") } : []
     }
 
-    /// Long-lived stream from the push relay; every message means "check in now".
+    /// Every message on the Mac's push topic means "check in now".
     func startPushListener() {
-        Thread.detachNewThread { [self] in
-            while true {
-                pushLock.lock(); let server = pushServer; pushLock.unlock()
-                guard let server else { Thread.sleep(forTimeInterval: 5); continue }
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
-                p.arguments = ["-sN", "--max-time", "3600", "\(server)/\(topic)/raw"]
-                let out = Pipe(); p.standardOutput = out; p.standardError = FileHandle.nullDevice
-                guard (try? p.run()) != nil else { Thread.sleep(forTimeInterval: 10); continue }
-                var buf = Data()
-                while true {
-                    let chunk = out.fileHandleForReading.availableData
-                    if chunk.isEmpty { break }
-                    buf.append(chunk)
-                    while let nl = buf.firstIndex(of: 10) {
-                        let line = buf[buf.startIndex..<nl]; buf.removeSubrange(buf.startIndex...nl)
-                        // ntfy sends empty lines as keepalives
-                        if line.contains(where: { $0 != 32 && $0 != 13 }) { pushLock.lock(); poked = true; pushLock.unlock() }
-                    }
-                }
-                p.waitUntilExit()
-                Thread.sleep(forTimeInterval: 3)
-            }
+        listenForPushes(topic: topic, server: { [self] in pushLock.lock(); defer { pushLock.unlock() }; return pushServer }) { [self] in
+            pushLock.lock(); poked = true; pushLock.unlock()
         }
     }
 
@@ -340,6 +352,12 @@ func qrImage(_ text: String, size: CGFloat) -> NSImage? {
 final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     let menu = NSMenu()
+    var screen: ScreenShare?
+    /// "Allow screen viewing": on unless the user turned it off on this Mac.
+    var screenAllowed: Bool {
+        get { UserDefaults.standard.object(forKey: "screenViewing") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "screenViewing") }
+    }
     /// Console URL baked in at build time (build.sh CONSOLE_URL=...), unless the user picked another one.
     var consoleURL: String {
         get { UserDefaults.standard.string(forKey: "url") ?? (Bundle.main.object(forInfoDictionaryKey: "MacWakeConsoleURL") as? String) ?? "" }
@@ -362,6 +380,11 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if item.button?.image == nil { item.button?.title = "MW" }
         menu.delegate = self; item.menu = menu
         rebuild()
+        // Dev only: stream to a test console without setting anything up:  open -n dist/MacWake.app --args --screen-test <url> <token>
+        if let i = CommandLine.arguments.firstIndex(of: "--screen-test"), CommandLine.arguments.count > i + 2 {
+            _ = CGRequestScreenCaptureAccess()
+            startScreen(url: CommandLine.arguments[i + 1], token: CommandLine.arguments[i + 2]); return
+        }
         if !installed || Token.load() == nil { DispatchQueue.main.async { self.setup() } }
         else if CommandLine.arguments.contains("--setup") { DispatchQueue.main.async { self.setup() } }
         else if CommandLine.arguments.contains("--pair") { DispatchQueue.main.async { self.showPairing() } }
@@ -369,6 +392,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         else if !FileManager.default.contentsEqual(atPath: Bundle.main.executablePath!, andPath: supportDir + "/MacWake") { DispatchQueue.main.async { self.setup() } }
         else { checkPairing() }
         Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.checkPairing() }
+        if installed, let t = Token.load(), !consoleURL.isEmpty { startScreen(url: consoleURL, token: t) }
     }
 
     /// The console may stop accepting a token this Mac shares with another (e.g. pasted into an older version,
@@ -387,6 +411,19 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) { rebuild() }
 
+    /// Live screen for paired viewers. Only this app can capture: the root daemon has no screen session.
+    func startScreen(url: String, token: String) {
+        let s = ScreenShare(url: url, token: token)
+        s.allowed = { [weak self] in self?.screenAllowed ?? false }
+        s.onLive = { [weak self] live in
+            self?.item.button?.image = NSImage(systemSymbolName: live ? "eye" : "powersleep", accessibilityDescription: live ? "MacWake: someone is viewing the screen" : "MacWake")
+        }
+        s.start()
+        screen = s
+    }
+
+    @objc func toggleViewing() { screenAllowed.toggle() }
+
     func rebuild() {
         menu.removeAllItems()
         let status = !installed ? "Not set up" : serviceRunning ? "Running, checking in with the console" : "Installed, but not running"
@@ -396,6 +433,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             add("Pair phone…", #selector(showPairing))
             add("Copy token", #selector(copyToken))
             add("Open console", #selector(openConsole))
+            add("Allow screen viewing", #selector(toggleViewing)).state = screenAllowed ? .on : .off
         } else {
             add("Set up…", #selector(setup))
         }
@@ -452,6 +490,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let r = runAdmin(App.installScript(Config(url: consoleURL, token: token), exe: Bundle.main.executablePath!))
         guard r.ok else { alert("MacWake couldn't install its background service", r.out); return }
         Token.save(token)   // only now: the QR code and Copy token must match what the background service uses
+        if screen == nil { startScreen(url: consoleURL, token: token) }
         rebuild()
         showPairing()
     }
