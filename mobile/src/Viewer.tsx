@@ -1,10 +1,11 @@
 /**
- * Full-screen live view of the Mac over WebRTC. Mirrors console-next/app/Viewer.js; decisions live in core.ts.
+ * Full-screen live view of the Mac over WebRTC, with mouse and keyboard control once the Mac allows it.
+ * Mirrors console-next/app/Viewer.js; decisions live in core.ts and control.ts.
  *
  * @format
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -36,6 +37,21 @@ import {
   type Session,
   type State,
 } from './core';
+import {
+  CONTROL_MESSAGES,
+  createSender,
+  type ControlStatus,
+  type Mode,
+} from './control';
+import {
+  KeysRow,
+  Typing,
+  useHardwareKeys,
+  useKeyboardHeight,
+  useKeys,
+  usePicture,
+  type TextInputRef,
+} from './Controls';
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(() => r(), ms));
 
@@ -53,6 +69,8 @@ function gathered(pc: RTCPeerConnection) {
   });
 }
 
+type Channel = ReturnType<RTCPeerConnection['createDataChannel']>;
+
 export default function Viewer({
   session,
   onClose,
@@ -66,7 +84,13 @@ export default function Viewer({
   const [status, setStatus] = useState('Connecting…');
   const [error, setError] = useState('');
   const [locked, setLocked] = useState(false);
+  const [control, setControl] = useState<ControlStatus | null>(null); // null: a view-only Mac app
+  const [size, setSize] = useState<number[]>([16, 10]); // the Mac's screen in points
+  const [mode, setMode] = useState<Mode>('direct');
+  const [typing, setTyping] = useState(false);
   const [attempt, setAttempt] = useState(0); // Try again re-runs the effect
+  const dc = useRef<Channel | null>(null);
+  const input = useRef<TextInputRef>(null);
 
   useEffect(() => {
     let closed = false;
@@ -83,6 +107,7 @@ export default function Viewer({
         setError('');
         setStream(null);
         setLocked(false);
+        setControl(null);
         setStatus('Connecting…');
         let ph: string = (await request<State>(session, 'state')).phase;
         if (needsWake(ph)) {
@@ -95,10 +120,16 @@ export default function Viewer({
           const conn = new RTCPeerConnection({ iceServers: ice });
           pc = conn;
           conn.addTransceiver('video', { direction: 'recvonly' });
-          const dc = conn.createDataChannel('control');
-          dc.onmessage = (e: any) => {
+          const ch = conn.createDataChannel('control');
+          dc.current = ch;
+          ch.onmessage = (e: any) => {
             try {
-              setLocked(!!JSON.parse(e.data).locked);
+              const d = JSON.parse(e.data);
+              if ('locked' in d) setLocked(!!d.locked);
+              if ('control' in d) {
+                setControl(d.control);
+                if (Array.isArray(d.size)) setSize(d.size);
+              }
             } catch {
               // not ours
             }
@@ -153,7 +184,46 @@ export default function Viewer({
     };
   }, [session, attempt]);
 
-  const msg = error || (locked && stream ? 'Mac is locked' : status);
+  // Control: only once the Mac says so (a Mac app without control never does, and stays view-only).
+  const send = useMemo(
+    () =>
+      createSender(
+        m => {
+          if (dc.current?.readyState === 'open')
+            dc.current.send(JSON.stringify(m));
+        },
+        f => requestAnimationFrame(f),
+      ),
+    [],
+  );
+  const ok = !!stream && !error && control === 'ok';
+  const picture = usePicture(
+    mode,
+    () => ({ box: { w: width, h: height }, size }),
+    send,
+    ok,
+  );
+  const keys = useKeys(send);
+  const hw = useHardwareKeys(ok, send);
+  const kb = useKeyboardHeight();
+  useEffect(() => {
+    if (!ok) setTyping(false);
+  }, [ok]);
+  const toggleTyping = () => {
+    if (typing) {
+      setTyping(false);
+      input.current?.blur();
+    } else {
+      setTyping(true);
+      if (!hw.connected) input.current?.focus();
+    }
+  };
+
+  const note =
+    stream && control && control !== 'ok'
+      ? CONTROL_MESSAGES[control] ?? ''
+      : '';
+  const msg = error || (locked && stream ? 'Mac is locked' : status) || note;
   // Once the picture is up, the Close bar hides after 3 s; the corner ••• button brings it back
   // (a tap on the picture itself is kept free for controlling the Mac).
   const [bar, setBar] = useState(true);
@@ -173,12 +243,26 @@ export default function Viewer({
     return () => clearTimeout(hide.current);
   }, [live]);
   const video = stream ? (
-    <RTCView
-      streamURL={stream.toURL()}
-      objectFit="contain"
-      style={{ width, height }}
-    />
+    <View style={{ width, height }} {...(ok ? picture.handlers : {})}>
+      <View pointerEvents="none">
+        <RTCView
+          streamURL={stream.toURL()}
+          objectFit="contain"
+          style={{ width, height }}
+        />
+      </View>
+      {picture.ring ? (
+        <View
+          pointerEvents="none"
+          style={[
+            st.ring,
+            { left: picture.ring.x - 22, top: picture.ring.y - 22 },
+          ]}
+        />
+      ) : null}
+    </View>
   ) : null;
+  const modeLabel = mode === 'direct' ? 'Direct' : 'Trackpad';
   return (
     <Modal animationType="fade" onRequestClose={onClose}>
       <StatusBar barStyle="light-content" />
@@ -188,10 +272,14 @@ export default function Viewer({
         accessibilityLabel="Mac screen"
       >
         {Platform.OS === 'ios' ? (
-          // Pinch to zoom into small text on the Mac's screen.
+          // Pinch to zoom into small text on the Mac's screen. While controlling, one finger belongs to the Mac,
+          // so panning happens with two fingers during the pinch; trackpad mode turns zoom off.
           <ScrollView
-            maximumZoomScale={4}
+            key={mode}
+            maximumZoomScale={ok && mode === 'trackpad' ? 1 : 4}
             minimumZoomScale={1}
+            scrollEnabled={!ok}
+            keyboardShouldPersistTaps="always"
             centerContent
             contentContainerStyle={st.fill}
             showsHorizontalScrollIndicator={false}
@@ -211,10 +299,35 @@ export default function Viewer({
             {msg}
           </Text>
         ) : null}
+        {ok ? (
+          <Typing
+            ref={input}
+            keys={keys}
+            onBlur={() => {
+              if (!hw.connected) setTyping(false);
+              hw.refocus();
+            }}
+          />
+        ) : null}
+        {ok && typing ? (
+          <KeysRow keys={keys} bottom={kb || inset.bottom + 84} />
+        ) : null}
         {bar ? (
           <View style={[st.bar, { paddingBottom: inset.bottom + 14 }]}>
             {error ? (
               <Btn label="Try again" onPress={() => setAttempt(n => n + 1)} />
+            ) : null}
+            {ok ? (
+              <Btn
+                label={modeLabel}
+                say={`Touch mode: ${modeLabel}`}
+                onPress={() =>
+                  setMode(m => (m === 'direct' ? 'trackpad' : 'direct'))
+                }
+              />
+            ) : null}
+            {ok ? (
+              <Btn label="Keys" selected={typing} onPress={toggleTyping} />
             ) : null}
             <Btn label="Close" onPress={onClose} />
           </View>
@@ -234,12 +347,28 @@ export default function Viewer({
   );
 }
 
-function Btn({ label, onPress }: { label: string; onPress: () => void }) {
+function Btn({
+  label,
+  say,
+  selected,
+  onPress,
+}: {
+  label: string;
+  say?: string;
+  selected?: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={say}
+      accessibilityState={selected === undefined ? undefined : { selected }}
       onPress={onPress}
-      style={({ pressed }) => [st.btn, pressed && st.pressed]}
+      style={({ pressed }) => [
+        st.btn,
+        selected && st.btnOn,
+        pressed && st.pressed,
+      ]}
     >
       <Text style={st.btnText}>{label}</Text>
     </Pressable>
@@ -280,7 +409,16 @@ const st = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#fff6',
   },
+  btnOn: { backgroundColor: '#fff3' },
   pressed: { opacity: 0.6 },
+  ring: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   more: {
     position: 'absolute',
     right: 14,

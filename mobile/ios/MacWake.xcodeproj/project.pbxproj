@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0329007313B97B6972C1433A /* HardwareKeys.m in Sources */ = {isa = PBXBuildFile; fileRef = 22E7BF584DADE42A3359B520 /* HardwareKeys.m */; };
 		0C80B921A6F3F58F76C31292 /* libPods-MacWake.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-MacWake.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		465D1AF02A10F1849313F382 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -14,6 +15,7 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		957EF830942D16C72D6D333B /* Onest-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 5E85CC145E594DE31F27C784 /* Onest-Regular.ttf */; };
 		9F8998B46A38FE83CD6D1E85 /* Onest-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = C369B43A2C497F371E96C019 /* Onest-Medium.ttf */; };
+		C0A9B38C818F95CD43994B71 /* HardwareKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F73044E96E10DAF90CE73BB /* HardwareKeys.swift */; };
 		D1C81C76E166E3BC096E7C15 /* Onest-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BA87F87D15F49CA5AFE22484 /* Onest-SemiBold.ttf */; };
 /* End PBXBuildFile section */
 
@@ -22,10 +24,12 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = MacWake/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = MacWake/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = MacWake/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		22E7BF584DADE42A3359B520 /* HardwareKeys.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HardwareKeys.m; path = MacWake/HardwareKeys.m; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-MacWake.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MacWake.debug.xcconfig"; path = "Target Support Files/Pods-MacWake/Pods-MacWake.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-MacWake.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MacWake.release.xcconfig"; path = "Target Support Files/Pods-MacWake/Pods-MacWake.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-MacWake.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MacWake.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E85CC145E594DE31F27C784 /* Onest-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "Onest-Regular.ttf"; path = "../assets/fonts/Onest-Regular.ttf"; sourceTree = "<group>"; };
+		6F73044E96E10DAF90CE73BB /* HardwareKeys.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HardwareKeys.swift; path = MacWake/HardwareKeys.swift; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = MacWake/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = MacWake/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		BA87F87D15F49CA5AFE22484 /* Onest-SemiBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "Onest-SemiBold.ttf"; path = "../assets/fonts/Onest-SemiBold.ttf"; sourceTree = "<group>"; };
@@ -53,6 +57,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				6F73044E96E10DAF90CE73BB /* HardwareKeys.swift */,
+				22E7BF584DADE42A3359B520 /* HardwareKeys.m */,
 			);
 			name = MacWake;
 			sourceTree = "<group>";
@@ -267,6 +273,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				C0A9B38C818F95CD43994B71 /* HardwareKeys.swift in Sources */,
+				0329007313B97B6972C1433A /* HardwareKeys.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
