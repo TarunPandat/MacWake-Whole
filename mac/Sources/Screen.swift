@@ -94,7 +94,8 @@ final class ScreenShare {
     }
 
     /// GET /api/screen (body nil) or POST it. `done` runs on the main queue with the body, or nil on any failure.
-    func call(_ body: [String: String]?, done: @escaping (Data?) -> Void) {
+    /// A reused connection the server already closed fails once with "network connection was lost"; retried once.
+    func call(_ body: [String: String]?, retry: Bool = true, done: @escaping (Data?) -> Void) {
         guard let u = URL(string: url + "/api/screen") else { return done(nil) }
         var req = URLRequest(url: u, timeoutInterval: 10)
         req.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
@@ -103,7 +104,10 @@ final class ScreenShare {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         }
-        URLSession.shared.dataTask(with: req) { data, resp, _ in
+        URLSession.shared.dataTask(with: req) { [weak self] data, resp, err in
+            if retry, (err as? URLError)?.code == .networkConnectionLost, let self {
+                return self.call(body, retry: false, done: done)
+            }
             let ok = (resp as? HTTPURLResponse)?.statusCode == 200
             DispatchQueue.main.async { done(ok ? data : nil) }
         }.resume()

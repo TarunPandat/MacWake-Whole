@@ -303,12 +303,18 @@ func request(_ method: String, _ url: String, token: String, body: [String: Any]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
     }
     var out: (Int, String?) = (0, "no response")
-    let sem = DispatchSemaphore(value: 0)
-    URLSession.shared.dataTask(with: req) { _, resp, err in
-        out = ((resp as? HTTPURLResponse)?.statusCode ?? 0, err?.localizedDescription)
-        sem.signal()
-    }.resume()
-    sem.wait()
+    // A reused connection the server already closed fails once with "network connection was lost"; a retry works.
+    for _ in 0..<2 {
+        var lost = false
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, resp, err in
+            out = ((resp as? HTTPURLResponse)?.statusCode ?? 0, err?.localizedDescription)
+            lost = (err as? URLError)?.code == .networkConnectionLost
+            sem.signal()
+        }.resume()
+        sem.wait()
+        if !lost { break }
+    }
     return out
 }
 
