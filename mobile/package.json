@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "test:core": "node --no-warnings src/core.check.ts"
+    "test:core": "node --no-warnings src/core.check.ts && node --no-warnings src/control.check.ts"
   },
   "dependencies": {
     "@react-native/new-app-screen": "0.87.1",
