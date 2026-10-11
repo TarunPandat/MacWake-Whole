@@ -4,6 +4,7 @@
 // web console, and keeps it awake (lighting the screen if the lid is open) when a wake
 // request is pending.
 import AppKit
+import ApplicationServices
 import Foundation
 import IOKit
 import IOKit.pwr_mgt
@@ -365,6 +366,14 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         get { UserDefaults.standard.object(forKey: "screenViewing") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "screenViewing") }
     }
+    /// "Allow remote control": on unless the user turned it off on this Mac. Also needs Accessibility.
+    var controlAllowed: Bool {
+        get { UserDefaults.standard.object(forKey: "remoteControl") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "remoteControl") }
+    }
+    var live = false                         // a viewer is connected
+    var lastInput = Date.distantPast        // last injected input, for the icon
+    var iconTimer: Timer?
     /// Set while "New token" runs setup, so pairing makes a fresh token instead of reusing the saved one.
     var renewing = false
     /// Console URL baked in at build time (build.sh CONSOLE_URL=...), unless the user picked another one.
@@ -424,11 +433,35 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func startScreen(url: String, token: String) {
         let s = ScreenShare(url: url, token: token)
         s.allowed = { [weak self] in self?.screenAllowed ?? false }
+        s.controlAllowed = { [weak self] in self?.controlAllowed ?? false }
         s.onLive = { [weak self] live in
-            self?.item.button?.image = NSImage(systemSymbolName: live ? "eye" : "powersleep", accessibilityDescription: live ? "MacWake: someone is viewing the screen" : "MacWake")
+            guard let self else { return }
+            self.live = live
+            self.iconTimer?.invalidate()
+            self.iconTimer = live ? Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.setIcon() } : nil
+            self.setIcon()
+        }
+        s.onInput = { [weak self] in
+            guard let self else { return }
+            let was = Date().timeIntervalSince(self.lastInput) < 5
+            self.lastInput = Date()
+            if !was { self.setIcon() }
         }
         s.start()
         screen = s
+    }
+
+    /// Menu-bar icon: asleep, watched (eye), or controlled (pointer, until 5 s after the last input).
+    func setIcon() {
+        let controlled = live && Date().timeIntervalSince(lastInput) < 5
+        let (name, label) = controlled ? ("cursorarrow.motionlines", "MacWake: someone is controlling this Mac")
+            : live ? ("eye", "MacWake: someone is viewing the screen") : ("powersleep", "MacWake")
+        item.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: label)
+    }
+
+    @objc func toggleControl() {
+        controlAllowed.toggle()
+        if controlAllowed && !AXIsProcessTrusted() { askAccessibility() }
     }
 
     @objc func toggleViewing() {
@@ -446,6 +479,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
             add("Copy token", #selector(copyToken))
             add("Open console", #selector(openConsole))
             add("Allow screen viewing", #selector(toggleViewing)).state = screenAllowed ? .on : .off
+            add("Allow remote control", #selector(toggleControl)).state = controlAllowed ? .on : .off
             add("New token (unpair all phones)…", #selector(newToken))
         } else {
             add("Set up…", #selector(setup))
@@ -504,6 +538,7 @@ final class App: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard r.ok else { alert("MacWake couldn't install its background service", r.out); return }
         Token.save(token)   // only now: the QR code and Copy token must match what the background service uses
         _ = CGRequestScreenCaptureAccess()      // once: macOS asks to allow Screen Recording, for live screen viewing
+        askAccessibility()                      // once: macOS asks to allow Accessibility, for remote control
         try? SMAppService.mainApp.register()    // start at login, so viewers can connect after a restart
         let restart = screen != nil && (screen?.token != token || screen?.url != consoleURL)
         if screen == nil { startScreen(url: consoleURL, token: token) }

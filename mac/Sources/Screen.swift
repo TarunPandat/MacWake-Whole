@@ -15,6 +15,10 @@ final class ScreenShare {
     var onLive: (Bool) -> Void = { _ in }
     /// The menu's "Allow screen viewing".
     var allowed: () -> Bool = { true }
+    /// The menu's "Allow remote control".
+    var controlAllowed: () -> Bool = { true }
+    /// Main queue: a viewer's input was just injected (the menu bar shows a pointer).
+    var onInput: () -> Void = {}
 
     private let lock = NSLock()
     private var pushServer: String?     // read by the push listener thread
@@ -74,7 +78,8 @@ final class ScreenShare {
             return post(offer.id, ["error": "permission"])
         }
         session?.stop()
-        let s = ViewSession(ice: ice)
+        let s = ViewSession(ice: ice, controlAllowed: { [weak self] in self?.controlAllowed() ?? false },
+                            onInput: { [weak self] in self?.onInput() })
         session = s
         s.onState = { [weak self, weak s] live in
             guard let self, let s, self.session === s else { return }
@@ -134,8 +139,13 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
     private var stream: SCStream?
     private var channel: RTCDataChannel?
     private var assertions: [IOPMAssertionID] = []
-    private var lockTimer: Timer?
+    private var statusTimer: Timer?
     private var sentLocked: Bool?
+    private var sentControl: String?
+    private let controlAllowed: () -> Bool
+    private let onInput: () -> Void
+    private var injector: Injector?
+    private var askedAccess = false
     private var dropTimer: DispatchWorkItem?
     private var connected = false
     private var stopped = false
@@ -144,8 +154,10 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
     private var lastFrameAt = CMTime.zero        // frames queue only
     private var repeater: DispatchSourceTimer?
 
-    init(ice: [ScreenShare.Ice]) {
+    init(ice: [ScreenShare.Ice], controlAllowed: @escaping () -> Bool, onInput: @escaping () -> Void) {
         self.ice = ice
+        self.controlAllowed = controlAllowed
+        self.onInput = onInput
         let src = ViewSession.factory.videoSource()
         source = src
         capturer = RTCVideoCapturer(delegate: src)
@@ -168,6 +180,7 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
                 guard let display = displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? displays.first else {
                     return done(.failure(ShareError(code: "no-display")))
                 }
+                self.injector = Injector(display: display.displayID)
                 self.capture(display) { ok in
                     guard ok else { return done(.failure(ShareError(code: "failed"))) }
                     self.negotiate(offer, done: done)
@@ -293,19 +306,48 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         DispatchQueue.main.async {
             self.channel = dataChannel
             dataChannel.delegate = self
-            self.lockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.sendLocked() }
+            self.statusTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.sendStatus() }
         }
     }
 
-    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) { DispatchQueue.main.async { self.sentLocked = nil; self.sendLocked() } }
-    func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {}   // control comes later
+    func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
+        DispatchQueue.main.async {
+            self.sentLocked = nil; self.sentControl = nil
+            if dataChannel.readyState != .open { self.injector?.releaseAll() }
+            self.sendStatus()
+        }
+    }
 
-    /// Tells the viewer when the Mac is at the lock screen (view-only can't unlock it).
-    private func sendLocked() {
+    /// Viewer input. Injected only while control is allowed and Accessibility is granted; asks for it once otherwise.
+    func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
+        guard !buffer.isBinary, let msg = (try? JSONSerialization.jsonObject(with: buffer.data)) as? [String: Any] else { return }
+        DispatchQueue.main.async {
+            guard !self.stopped, let injector = self.injector else { return }
+            switch self.controlStatus() {
+            case "ok": injector.handle(msg); self.onInput()
+            case "permission": if !self.askedAccess { self.askedAccess = true; askAccessibility() }
+            default: break
+            }
+        }
+    }
+
+    private func controlStatus() -> String { !controlAllowed() ? "off" : AXIsProcessTrusted() ? "ok" : "permission" }
+
+    /// Tells the viewer when the Mac is at the lock screen and whether it may control it. On change; 1 s timer.
+    private func sendStatus() {
         guard let c = channel, c.readyState == .open else { return }
         let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
-        guard locked != sentLocked else { return }
-        if c.sendData(RTCDataBuffer(data: Data("{\"locked\":\(locked)}".utf8), isBinary: false)) { sentLocked = locked }
+        if locked != sentLocked, send(["locked": locked], on: c) { sentLocked = locked }
+        let control = controlStatus()
+        guard control != sentControl else { return }
+        if control != "ok" { injector?.releaseAll() }
+        let size = injector.map { [Int($0.bounds.width), Int($0.bounds.height)] } ?? [16, 10]
+        if send(["control": control, "size": size], on: c) { sentControl = control }
+    }
+
+    private func send(_ obj: [String: Any], on c: RTCDataChannel) -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: obj) else { return false }
+        return c.sendData(RTCDataBuffer(data: data, isBinary: false))
     }
 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
@@ -321,7 +363,8 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
     func stop() {
         guard !stopped else { return }
         stopped = true
-        dropTimer?.cancel(); lockTimer?.invalidate(); repeater?.cancel()
+        dropTimer?.cancel(); statusTimer?.invalidate(); repeater?.cancel()
+        injector?.releaseAll(); injector = nil
         stream?.stopCapture { _ in }
         channel?.close(); pc?.close()
         stream = nil; channel = nil; pc = nil
