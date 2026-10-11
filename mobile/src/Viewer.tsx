@@ -111,13 +111,17 @@ export default function Viewer({
               wasLive = true;
               setStatus('');
             } else if (s === 'failed') fail(wasLive ? 'lost' : 'ice');
-            else if (s === 'disconnected') lost = setTimeout(() => fail('lost'), 10e3);
+            else if (s === 'disconnected')
+              lost = setTimeout(() => fail('lost'), 10e3);
           };
           await conn.setLocalDescription(await conn.createOffer({}));
           await gathered(conn);
           const id = newId();
           setStatus(ph === 'requested' ? 'Waking your Mac…' : 'Connecting…');
-          await request(session, 'screen', { id, offer: conn.localDescription?.sdp });
+          await request(session, 'screen', {
+            id,
+            offer: conn.localDescription?.sdp,
+          });
           const t0 = Date.now();
           let next: Next = { kind: 'wait' };
           while (!closed && next.kind === 'wait') {
@@ -169,12 +173,20 @@ export default function Viewer({
     return () => clearTimeout(hide.current);
   }, [live]);
   const video = stream ? (
-    <RTCView streamURL={stream.toURL()} objectFit="contain" style={{ width, height }} />
+    <RTCView
+      streamURL={stream.toURL()}
+      objectFit="contain"
+      style={{ width, height }}
+    />
   ) : null;
   return (
     <Modal animationType="fade" onRequestClose={onClose}>
       <StatusBar barStyle="light-content" />
-      <View style={st.fill} accessibilityViewIsModal accessibilityLabel="Mac screen">
+      <View
+        style={st.fill}
+        accessibilityViewIsModal
+        accessibilityLabel="Mac screen"
+      >
         {Platform.OS === 'ios' ? (
           // Pinch to zoom into small text on the Mac's screen.
           <ScrollView
@@ -201,7 +213,9 @@ export default function Viewer({
         ) : null}
         {bar ? (
           <View style={[st.bar, { paddingBottom: inset.bottom + 14 }]}>
-            {error ? <Btn label="Try again" onPress={() => setAttempt(n => n + 1)} /> : null}
+            {error ? (
+              <Btn label="Try again" onPress={() => setAttempt(n => n + 1)} />
+            ) : null}
             <Btn label="Close" onPress={onClose} />
           </View>
         ) : (
