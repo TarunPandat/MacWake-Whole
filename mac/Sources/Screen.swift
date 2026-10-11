@@ -293,6 +293,7 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
                 self.dropTimer?.cancel(); self.dropTimer = nil
                 if !self.stopped { self.connected = true; self.onState(true) }
             case .disconnected:
+                self.injector?.releaseAll()   // let go now; the connection may come back, the held keys shouldn't
                 let w = DispatchWorkItem { self.stop() }   // a blip can recover; a closed lid or tab won't
                 self.dropTimer?.cancel(); self.dropTimer = w
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: w)
@@ -318,16 +319,13 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         }
     }
 
-    /// Viewer input. Injected only while control is allowed and Accessibility is granted; asks for it once otherwise.
+    /// Viewer input. Injected only while control is allowed and Accessibility is granted.
     func dataChannel(_ dataChannel: RTCDataChannel, didReceiveMessageWith buffer: RTCDataBuffer) {
         guard !buffer.isBinary, let msg = (try? JSONSerialization.jsonObject(with: buffer.data)) as? [String: Any] else { return }
         DispatchQueue.main.async {
             guard !self.stopped, let injector = self.injector else { return }
-            switch self.controlStatus() {
-            case "ok": injector.handle(msg); self.onInput()
-            case "permission": if !self.askedAccess { self.askedAccess = true; askAccessibility() }
-            default: break
-            }
+            guard self.controlStatus() == "ok" else { return }
+            injector.handle(msg); self.onInput()
         }
     }
 
@@ -339,6 +337,8 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
         if locked != sentLocked, send(["locked": locked], on: c) { sentLocked = locked }
         let control = controlStatus()
+        // Lists MacWake under Accessibility and asks once per session (an upgraded Mac may never have been asked).
+        if control == "permission" && !askedAccess { askedAccess = true; askAccessibility() }
         guard control != sentControl else { return }
         if control != "ok" { injector?.releaseAll() }
         let size = injector.map { [Int($0.bounds.width), Int($0.bounds.height)] } ?? [16, 10]

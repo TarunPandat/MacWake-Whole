@@ -28,6 +28,9 @@ export const CONTROL_MESSAGES: Record<'off' | 'permission', string> = {
 export const SLOP = 10; // px a finger may wander and still count as a tap
 export const LONG_PRESS = 500; // ms
 export const TWO_TAP = 300; // ms, two-finger tap (trackpad right click)
+// ms: a tap this soon after the last, within SLOP, reuses its spot (a zoomed-out phone picture turns a
+// 2 px wobble into more than the Mac's 4 pt double-click radius)
+const DOUBLE_TAP = 500;
 const GAIN = 1.5; // trackpad: pointer moves 1.5x the finger,
 const FAST = 0.8; // twice that above 0.8 px/ms
 
@@ -64,6 +67,7 @@ export function createGestures(mode: Mode, view: () => PictureView) {
   let twoAt = 0;
   let prev = { x: 0, y: 0 };
   let prevT = 0;
+  let lastTap: { x: number; y: number; t: number } | null = null;
   const scale = () => {
     const { box, size } = view();
     return Math.min(box.w / size[0], box.h / size[1]);
@@ -99,6 +103,23 @@ export function createGestures(mode: Mode, view: () => PictureView) {
     { b, d: 0 },
   ];
   const letGo = (): Msg[] => (state === 'drag' ? [{ b: 0, d: 0 }] : []);
+  const tap = (p: Touch, t: number): Msg[] => {
+    if (
+      direct &&
+      lastTap &&
+      since - lastTap.t <= DOUBLE_TAP &&
+      Math.hypot(p.x0 - lastTap.x, p.y0 - lastTap.y) <= SLOP
+    ) {
+      p.x0 = lastTap.x;
+      p.y0 = lastTap.y;
+    }
+    lastTap = { x: p.x0, y: p.y0, t };
+    return click(0, p);
+  };
+  const outside = (x: number, y: number) => {
+    const { box, size } = view();
+    return !fraction(x, y, box, size).inside;
+  };
 
   return {
     get state() {
@@ -108,7 +129,8 @@ export function createGestures(mode: Mode, view: () => PictureView) {
       if (touches.has(id)) return [];
       touches.set(id, { x0: x, y0: y, x, y });
       if (touches.size === 1) {
-        state = 'pending';
+        // a direct touch in the black bars does nothing
+        state = direct && outside(x, y) ? 'ignore' : 'pending';
         since = prevT = t;
         prev = { x, y };
         return [];
@@ -190,7 +212,7 @@ export function createGestures(mode: Mode, view: () => PictureView) {
       touches.delete(id);
       const out =
         state === 'pending'
-          ? click(0, p)
+          ? tap(p, t)
           : state === 'held'
           ? click(1, p)
           : state === 'two' && t - twoAt < TWO_TAP

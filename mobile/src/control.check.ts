@@ -285,6 +285,41 @@ later.forEach(f => f());
 eq(sent.length, 3, 'the frame flush finds nothing left');
 eq(later.length, 1, 'one frame was asked for');
 
+// Final review: taps in the black bars, and double taps on a zoomed-out phone picture.
+const boxed = () => ({ box: { w: 200, h: 300 }, size: [200, 100] }); // portrait phone: bars above and below
+g = createGestures('direct', boxed);
+g.down(1, 100, 20, 0);
+eq(g.up(1, 50), [], 'a direct tap in a black bar does nothing');
+g.down(1, 100, 20, 0);
+eq(g.move(1, 100, 80, 50), [], 'nor does a drag that starts there');
+g.up(1, 60);
+eq(g.state, 'idle', 'and it ends cleanly');
+g = createGestures('direct', view);
+g.down(1, 50, 50, 0);
+eq(
+  g.up(1, 80),
+  [{ m: [0.25, 0.5] }, { b: 0, d: 1 }, { b: 0, d: 0 }],
+  'first tap',
+);
+g.down(1, 52, 51, 200);
+eq(
+  g.up(1, 260),
+  [{ m: [0.25, 0.5] }, { b: 0, d: 1 }, { b: 0, d: 0 }],
+  "a quick second tap nearby lands on the first one's spot, so the Mac counts a double click",
+);
+g.down(1, 90, 50, 400);
+eq(
+  g.up(1, 450),
+  [{ m: [0.45, 0.5] }, { b: 0, d: 1 }, { b: 0, d: 0 }],
+  'a tap elsewhere clicks where it is',
+);
+g.down(1, 91, 50, 1200);
+eq(
+  g.up(1, 1250),
+  [{ m: [0.455, 0.5] }, { b: 0, d: 1 }, { b: 0, d: 0 }],
+  'too late for a double tap: its own spot',
+);
+
 eq(
   Object.keys(CONTROL_MESSAGES).sort(),
   ['off', 'permission'],

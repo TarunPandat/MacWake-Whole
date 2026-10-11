@@ -7,6 +7,7 @@
 
 import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   Keyboard,
   NativeEventEmitter,
   NativeModules,
@@ -47,8 +48,11 @@ export function usePicture(
   const latest = useRef({ view, send, enabled });
   latest.current = { view, send, enabled };
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const g = useMemo(
+    () => createGestures(mode, () => latest.current.view()),
+    [mode],
+  );
   const handlers = useMemo(() => {
-    const g = createGestures(mode, () => latest.current.view());
     const each = (
       e: GestureResponderEvent,
       fn: (id: string, x: number, y: number) => Msg[],
@@ -88,8 +92,17 @@ export function usePicture(
         latest.current.send(g.cancel());
       },
     }).panHandlers;
-  }, [mode]);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  }, [g]);
+  // A mode change, control turning off or the viewer closing mid-gesture: let go, so the next touch starts fresh.
+  const reset = () => {
+    clearTimeout(timer.current);
+    setRing(null);
+    latest.current.send(g.cancel());
+  };
+  useEffect(() => reset, [g]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!enabled) reset();
+  }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   return { handlers, ring };
 }
 
@@ -134,8 +147,13 @@ export function useHardwareKeys(enabled: boolean, send: Send) {
         setConnected((e as { connected: boolean }).connected),
       ),
     ];
+    // ⌘Tab and friends take the app away mid-shortcut: let go of whatever is held.
+    const away = AppState.addEventListener('change', s => {
+      if (s !== 'active') latest.current(held.releaseAll());
+    });
     native.start();
     return () => {
+      away.remove();
       subs.forEach(s => s.remove());
       native.stop();
       latest.current(held.releaseAll());
