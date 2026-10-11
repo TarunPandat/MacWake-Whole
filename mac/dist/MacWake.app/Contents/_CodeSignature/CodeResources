@@ -11,6 +11,15 @@
 	</dict>
 	<key>files2</key>
 	<dict>
+		<key>Frameworks/WebRTC.framework</key>
+		<dict>
+			<key>cdhash</key>
+			<data>
+			0LgQrCQ1LorN7/fVP4js4Hz+uy8=
+			</data>
+			<key>requirement</key>
+			<string>cdhash H"d0b810ac24352e8acdeff7d53f88ece07cfebb2f" or cdhash H"d0da175a48cdcb7bd2fae59d75db6e5af611c07e"</string>
+		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>
 			<key>hash2</key>
