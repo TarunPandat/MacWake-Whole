@@ -20,16 +20,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
-
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "MacWake",
-      in: window,
-      launchOptions: launchOptions
-    )
-
+    // The window comes from SceneDelegate: iOS 27 stops apps that don't use the scene lifecycle at launch.
     return true
+  }
+}
+
+/// Creates the window for the app's one scene and starts React Native in it (UIApplicationSceneManifest in Info.plist).
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let app = UIApplication.shared.delegate as? AppDelegate else { return }
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    app.window = window
+    app.reactNativeFactory?.startReactNative(withModuleName: "MacWake", in: window, launchOptions: nil)
   }
 }
 
