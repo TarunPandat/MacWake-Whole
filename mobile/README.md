@@ -91,4 +91,4 @@ If the bundle ID `io.macwake.mobile` is taken under your team, change it in Xcod
 `react-native-webrtc` (pinned 124.0.8); after installing or updating it run `cd ios && LANG=en_US.UTF-8 pod install`
 and restart Metro. Decisions and text live in `src/core.ts` and mirror `console-next/lib/screen.js`.
 
-While watching, the Mac can be controlled: Direct/Trackpad touch modes, three-finger swipes for Spaces and Mission Control, Keys for the phone keyboard and Mac keys row, and an iPad hardware keyboard sends keys directly (iOS only).
+While watching, the Mac can be controlled: Direct/Trackpad touch modes, three-finger swipes for Spaces and Mission Control, Keys for the phone keyboard and Mac keys row, and an iPad hardware keyboard sends keys directly (iOS only), with Control standing for ⌘ (⌃C copy, ⌃W close the Mac's tab; ⌃ arrows stay ⌃).

@@ -100,6 +100,10 @@ encrypted; the console only passes the connection setup along.
   and long-presses then drags to drag or select. **Trackpad** mode moves the pointer like a laptop trackpad (two
   fingers scroll, two-finger tap right-clicks). **Keys** opens the keyboard plus a row with esc, tab, arrows and
   sticky ⌘ ⌥ ⌃ ⇧ (tap ⌘, then type c, for ⌘C). On iPad, a Magic Keyboard sends every key directly.
+- **Shortcuts**: on an iPad or PC keyboard, Control works as ⌘ on the Mac (⌃C copy, ⌃V paste, ⌃W close tab,
+  ⌃T new tab, ⌃Q quit), so iPadOS doesn't close its own window; ⌃ arrows still switch Spaces. The keys row's
+  ⌘ ⌥ ⌃ ⇧ also apply to the next key on a real keyboard, for shortcuts the iPad or browser keeps (⌘Space, ⌘Tab),
+  and it has a space key. In Chrome or Edge on a computer, **Full screen** sends ⌘W, ⌘T and ⌘N to the Mac too.
 - **Spaces and Mission Control**: swipe with three fingers on the screen, like on a Mac trackpad: left or right
   switches Space, up opens Mission Control, down App Exposé. ⌃← / ⌃→ / ⌃↑ / ⌃↓ work from a keyboard or the keys
   row too. On iPad, four fingers work once iPadOS's own four- and five-finger gestures are off (Settings →

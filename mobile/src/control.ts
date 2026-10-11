@@ -355,6 +355,7 @@ export const KEYS_ROW: {
 }[] = [
   { label: 'esc', say: 'Escape', key: 'Escape' },
   { label: 'tab', say: 'Tab', key: 'Tab' },
+  { label: 'space', say: 'Space', key: 'Space' },
   { label: '⌘', say: 'Command', mod: 'meta' },
   { label: '⌥', say: 'Option', mod: 'alt' },
   { label: '⌃', say: 'Control', mod: 'ctrl' },
@@ -425,13 +426,55 @@ const MODIFIER_CODES = new Set([
 
 /**
  * Physical keys from a real keyboard. Tracks what is held so nothing stays stuck on the Mac: macOS browsers send
- * no keyup for keys released while ⌘ is down, so letting go of ⌘ releases them too.
+ * no keyup for keys released while ⌘ is down, so letting go of ⌘ releases them too. With `keys` (createKeys),
+ * modifiers latched on the keys row apply to the next real key, for shortcuts the browser or iPadOS would grab.
  */
-export function createHeld() {
+export function createHeld(
+  keys?: { latched: () => Mod[]; press: (code: string) => Msg[] } | null,
+  { ctrlAsCmd = false } = {},
+) {
   const held = new Set<string>();
+  const latchedUp = new Set<string>();
+  let ctrl = false; // ctrlAsCmd: Control is down,
+  let as: string | null = null; // and the Mac modifier it stands for right now
+  const standIn = (want: string): Msg[] => {
+    const out: Msg[] = [];
+    if (as !== want) {
+      if (as) {
+        out.push({ k: as, d: 0 });
+        held.delete(as);
+      }
+      out.push({ k: want, d: 1 });
+      held.add(want);
+      as = want;
+    }
+    return out;
+  };
   return {
     key(code: string, down: boolean): Msg[] {
       if (!code) return [];
+      if (ctrlAsCmd && (code === 'ControlLeft' || code === 'ControlRight')) {
+        if (down) {
+          ctrl = true;
+          return [];
+        }
+        const out: Msg[] = as ? [{ k: as, d: 0 }] : [];
+        if (as) held.delete(as);
+        ctrl = false;
+        as = null;
+        return out;
+      }
+      if (down && keys?.latched().length && !MODIFIER_CODES.has(code)) {
+        latchedUp.add(code);
+        return keys.press(code);
+      }
+      if (!down && latchedUp.delete(code)) return []; // press() already let go of it
+      if (down && ctrl && !MODIFIER_CODES.has(code)) {
+        // ⌃ arrows switch Spaces; ⌃ with anything else is ⌘
+        const out = standIn(ARROWS.has(code) ? 'ControlLeft' : 'MetaLeft');
+        held.add(code);
+        return [...out, { k: code, d: 1 }];
+      }
       if (down) {
         held.add(code);
         return [{ k: code, d: 1 }];
@@ -449,10 +492,22 @@ export function createHeld() {
     releaseAll(): Msg[] {
       const out = [...held].map(k => ({ k, d: 0 }));
       held.clear();
+      ctrl = false;
+      as = null;
       return out;
     },
   };
 }
+
+const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+
+/**
+ * Whether Control should act as ⌘ for this viewer: on iPad and PC keyboards ⌃C / ⌃W / ⌃T mean copy, close tab
+ * and new tab (and iPadOS would grab ⌘W for itself). Only a Mac's own keyboard, in a desktop browser, keeps them
+ * apart. The app always runs on iOS or Android, so it always passes true.
+ */
+export const ctrlIsCmd = (platform: string, touchPoints: number) =>
+  !(/^Mac/.test(platform) && !touchPoints);
 
 /**
  * Sends at most one pointer message per frame: the last `m`, summed `r` and `s`. Anything else goes out at

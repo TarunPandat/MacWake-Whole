@@ -204,7 +204,7 @@ export default function Viewer({
     ok,
   );
   const keys = useKeys(send);
-  const hw = useHardwareKeys(ok, send);
+  const hw = useHardwareKeys(ok, keys);
   const kb = useKeyboardHeight();
   useEffect(() => {
     if (!ok) setTyping(false);

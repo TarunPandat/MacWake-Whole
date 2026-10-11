@@ -106,9 +106,14 @@ export function usePicture(
   return { handlers, ring };
 }
 
-/** Sticky ⌘ ⌥ ⌃ ⇧ from the keys row plus typed text; `latched` drives the row's highlight. */
+/**
+ * Sticky ⌘ ⌥ ⌃ ⇧ from the keys row, typed text, and a hardware keyboard's keys (which the latched modifiers
+ * apply to); `latched` drives the row's highlight.
+ */
 export function useKeys(send: Send) {
   const keys = useMemo(createKeys, []);
+  // iPad keyboards: Control stands for ⌘ (⌃C copy, ⌃W close the Mac's tab; iPadOS keeps ⌘W for itself).
+  const held = useMemo(() => createHeld(keys, { ctrlAsCmd: true }), [keys]);
   const [latched, setLatched] = useState<Mod[]>([]);
   const after = (out: Msg[]) => {
     send(out);
@@ -122,6 +127,8 @@ export function useKeys(send: Send) {
       keys.toggle(mod);
       setLatched(keys.latched());
     },
+    key: (code: string, down: boolean) => after(held.key(code, down)),
+    releaseAll: () => after(held.releaseAll()),
   };
 }
 export type KeysApi = ReturnType<typeof useKeys>;
@@ -129,19 +136,18 @@ export type KeysApi = ReturnType<typeof useKeys>;
 const native = Platform.OS === 'ios' ? NativeModules.HardwareKeys : null;
 
 /** iPad hardware keyboard -> Mac keys while `enabled` (iOS only). `connected` says whether one is attached. */
-export function useHardwareKeys(enabled: boolean, send: Send) {
+export function useHardwareKeys(enabled: boolean, keys: KeysApi) {
   const [connected, setConnected] = useState(false);
-  const latest = useRef(send);
-  latest.current = send;
+  const latest = useRef(keys);
+  latest.current = keys;
   useEffect(() => {
     if (!native || !enabled) return;
-    const held = createHeld();
     const events = new NativeEventEmitter(native);
     const subs = [
       events.addListener('key', (e: Object) => {
         const { usage, down } = e as { usage: number; down: boolean };
         const code = hidToCode(usage);
-        if (code) latest.current(held.key(code, down));
+        if (code) latest.current.key(code, down);
       }),
       events.addListener('keyboard', (e: Object) =>
         setConnected((e as { connected: boolean }).connected),
@@ -149,14 +155,14 @@ export function useHardwareKeys(enabled: boolean, send: Send) {
     ];
     // ⌘Tab and friends take the app away mid-shortcut: let go of whatever is held.
     const away = AppState.addEventListener('change', s => {
-      if (s !== 'active') latest.current(held.releaseAll());
+      if (s !== 'active') latest.current.releaseAll();
     });
     native.start();
     return () => {
       away.remove();
       subs.forEach(s => s.remove());
       native.stop();
-      latest.current(held.releaseAll());
+      latest.current.releaseAll();
     };
   }, [enabled]);
   return {

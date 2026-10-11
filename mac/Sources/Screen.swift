@@ -158,7 +158,7 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         self.ice = ice
         self.controlAllowed = controlAllowed
         self.onInput = onInput
-        let src = ViewSession.factory.videoSource()
+        let src = ViewSession.factory.videoSource(forScreenCast: true)   // encoder tuned for text and UI, not camera video
         source = src
         capturer = RTCVideoCapturer(delegate: src)
         super.init()
@@ -201,7 +201,7 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         let screen = NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == display.displayID }
         let scale = screen?.backingScaleFactor ?? 1
         let w = Double(display.width) * scale, h = Double(display.height) * scale
-        let k = min(1, 1920 / max(w, h))   // long edge at most 1920 px
+        let k = min(1, 3840 / max(w, h))   // native Retina pixels; very large displays capped at 4K so encoding keeps up
         let cfg = SCStreamConfiguration()
         cfg.width = Int(w * k) / 2 * 2; cfg.height = Int(h * k) / 2 * 2   // even sizes for the encoder
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: 30)
@@ -228,11 +228,13 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
         pc.setRemoteDescription(RTCSessionDescription(type: .offer, sdp: offer)) { error in
             if error != nil { return fail() }
             // After the offer, so the track takes the viewer's recvonly video slot.
-            pc.add(ViewSession.factory.videoTrack(with: self.source, trackId: "screen"), streamIds: ["screen"])
+            let sender = pc.add(ViewSession.factory.videoTrack(with: self.source, trackId: "screen"), streamIds: ["screen"])
+            ViewSession.preferH264(pc.transceivers.first { $0.sender === sender })
             pc.answer(for: constraints) { sdp, error in
                 guard let sdp, error == nil else { return fail() }
                 pc.setLocalDescription(sdp) { error in
                     if error != nil { return fail() }
+                    if let sender { ViewSession.sharpen(sender) }
                     self.whenGathered {
                         guard let local = pc.localDescription?.sdp, !self.stopped else { return done(.failure(ShareError(code: "failed"))) }
                         done(.success(local))
@@ -240,6 +242,22 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
                 }
             }
         }
+    }
+
+    /// Hardware H.264 first (the Mac's video chip stays fast and cool at Retina size); the viewer's other codecs remain fallbacks.
+    private static func preferH264(_ t: RTCRtpTransceiver?) {
+        guard let t else { return }
+        let all = factory.rtpSenderCapabilities(forKind: kRTCMediaStreamTrackKindVideo).codecs
+        // A refusal just keeps the viewer's order.
+        try? t.setCodecPreferences(all.filter { $0.name == "H264" } + all.filter { $0.name != "H264" }, error: ())
+    }
+
+    /// Text stays sharp: on a slow network or a busy Mac, lower the frame rate, never the resolution. Up to 20 Mbps, 30 fps.
+    private static func sharpen(_ sender: RTCRtpSender) {
+        let p = sender.parameters
+        p.degradationPreference = NSNumber(value: RTCDegradationPreference.maintainResolution.rawValue)
+        for e in p.encodings { e.maxBitrateBps = 20_000_000; e.maxFramerate = 30 }
+        sender.parameters = p
     }
 
     /// Non-trickle signaling: wait until every ICE candidate is in the SDP, at most 3 s. Calls back on main.

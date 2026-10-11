@@ -6,6 +6,7 @@ import {
   createHeld,
   createKeys,
   createSender,
+  ctrlIsCmd,
   edit,
   fraction,
   hidToCode,
@@ -231,7 +232,11 @@ eq(
   'a character with no key types as text and drops the latch',
 );
 eq(keys.latched(), [], 'dropped');
-eq(KEYS_ROW.map(k => k.label).join(' '), 'esc tab ⌘ ⌥ ⌃ ⇧ ← ↑ ↓ →', 'keys row');
+eq(
+  KEYS_ROW.map(k => k.label).join(' '),
+  'esc tab space ⌘ ⌥ ⌃ ⇧ ← ↑ ↓ →',
+  'keys row',
+);
 
 eq(edit(''), { backspace: true }, 'the space was deleted: Backspace');
 eq(edit(' a'), { text: 'a' }, 'typed after the space');
@@ -409,6 +414,130 @@ for (const mode of ['direct', 'trackpad']) {
   g.up(3, 100);
   g.up(4, 100);
 }
+
+// On-screen ⌘ ⌥ ⌃ ⇧ also apply to the next key on a real keyboard (shortcuts a browser or iPadOS would grab).
+const k2 = createKeys(),
+  h2 = createHeld(k2);
+k2.toggle('meta');
+eq(
+  h2.key('ShiftLeft', true),
+  [{ k: 'ShiftLeft', d: 1 }],
+  'a real modifier passes through and keeps the latch',
+);
+eq(k2.latched(), ['meta'], 'still latched');
+eq(
+  h2.key('KeyW', true),
+  [
+    { k: 'MetaLeft', d: 1 },
+    { k: 'KeyW', d: 1 },
+    { k: 'KeyW', d: 0 },
+    { k: 'MetaLeft', d: 0 },
+  ],
+  'on-screen ⌘ then W on a real keyboard sends ⌘W',
+);
+eq(k2.latched(), [], 'the latch is used');
+eq(h2.key('KeyW', false), [], "that key's own key-up is swallowed");
+eq(
+  h2.key('KeyW', true),
+  [{ k: 'KeyW', d: 1 }],
+  "next time it's a plain key again",
+);
+eq(
+  h2.key('ShiftLeft', false),
+  [{ k: 'ShiftLeft', d: 0 }],
+  'real modifiers still release normally',
+);
+eq(
+  createHeld().key('KeyA', true),
+  [{ k: 'KeyA', d: 1 }],
+  "without a keys row it's plain physical keys",
+);
+
+// iPad / PC keyboards: Control stands for ⌘ (⌃C copies, ⌃W closes the Mac\'s tab, not the iPad\'s window); ⌃ arrows stay ⌃.
+const ip = createHeld(null, { ctrlAsCmd: true });
+eq(ip.key('ControlLeft', true), [], 'Control waits to see the next key');
+eq(
+  ip.key('KeyW', true),
+  [
+    { k: 'MetaLeft', d: 1 },
+    { k: 'KeyW', d: 1 },
+  ],
+  '⌃W reaches the Mac as ⌘W',
+);
+eq(ip.key('KeyW', false), [{ k: 'KeyW', d: 0 }], 'W up');
+eq(
+  ip.key('ArrowRight', true),
+  [
+    { k: 'MetaLeft', d: 0 },
+    { k: 'ControlLeft', d: 1 },
+    { k: 'ArrowRight', d: 1 },
+  ],
+  '⌃→ stays ⌃→ (switch Space)',
+);
+eq(ip.key('ArrowRight', false), [{ k: 'ArrowRight', d: 0 }], '→ up');
+eq(
+  ip.key('ControlLeft', false),
+  [{ k: 'ControlLeft', d: 0 }],
+  'letting go of Control releases what it stood for',
+);
+eq(
+  ip.key('ControlRight', true).concat(ip.key('ControlRight', false)),
+  [],
+  'a lone Control tap sends nothing',
+);
+eq(
+  ip
+    .key('ControlLeft', true)
+    .concat(
+      ip.key('KeyC', true),
+      ip.key('KeyC', false),
+      ip.key('ControlLeft', false),
+    ),
+  [
+    { k: 'MetaLeft', d: 1 },
+    { k: 'KeyC', d: 1 },
+    { k: 'KeyC', d: 0 },
+    { k: 'MetaLeft', d: 0 },
+  ],
+  '⌃C is ⌘C (copy)',
+);
+eq(
+  ip.key('MetaLeft', true),
+  [{ k: 'MetaLeft', d: 1 }],
+  'the real ⌘ key still sends ⌘',
+);
+ip.key('MetaLeft', false);
+ip.key('ControlLeft', true);
+ip.key('KeyT', true);
+eq(
+  ip.releaseAll(),
+  [
+    { k: 'MetaLeft', d: 0 },
+    { k: 'KeyT', d: 0 },
+  ],
+  'release all lets go of the stand-in too',
+);
+eq(
+  ip.key('KeyT', true),
+  [{ k: 'KeyT', d: 1 }],
+  'and Control is no longer held after it',
+);
+eq(
+  createHeld().key('ControlLeft', true),
+  [{ k: 'ControlLeft', d: 1 }],
+  'Mac browsers: Control is Control',
+);
+eq(
+  [
+    ['MacIntel', 0],
+    ['MacIntel', 5],
+    ['Win32', 0],
+    ['Linux x86_64', 0],
+    ['iPad', 5],
+  ].map(([p, n]) => ctrlIsCmd(p as string, n as number)),
+  [false, true, true, true, true],
+  "Control means ⌘ everywhere except on a Mac's own keyboard",
+);
 
 eq(
   Object.keys(CONTROL_MESSAGES).sort(),
