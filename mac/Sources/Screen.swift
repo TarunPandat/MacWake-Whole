@@ -229,7 +229,6 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
             if error != nil { return fail() }
             // After the offer, so the track takes the viewer's recvonly video slot.
             let sender = pc.add(ViewSession.factory.videoTrack(with: self.source, trackId: "screen"), streamIds: ["screen"])
-            ViewSession.preferH264(pc.transceivers.first { $0.sender === sender })
             pc.answer(for: constraints) { sdp, error in
                 guard let sdp, error == nil else { return fail() }
                 pc.setLocalDescription(sdp) { error in
@@ -242,14 +241,6 @@ final class ViewSession: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDele
                 }
             }
         }
-    }
-
-    /// Hardware H.264 first (the Mac's video chip stays fast and cool at Retina size); the viewer's other codecs remain fallbacks.
-    private static func preferH264(_ t: RTCRtpTransceiver?) {
-        guard let t else { return }
-        let all = factory.rtpSenderCapabilities(forKind: kRTCMediaStreamTrackKindVideo).codecs
-        // A refusal just keeps the viewer's order.
-        try? t.setCodecPreferences(all.filter { $0.name == "H264" } + all.filter { $0.name != "H264" }, error: ())
     }
 
     /// Text stays sharp: on a slow network or a busy Mac, lower the frame rate, never the resolution. Up to 20 Mbps, 30 fps.
