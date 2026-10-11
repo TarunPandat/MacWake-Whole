@@ -4,7 +4,7 @@
  * @format
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -150,6 +150,24 @@ export default function Viewer({
   }, [session, attempt]);
 
   const msg = error || (locked && stream ? 'Mac is locked' : status);
+  // Once the picture is up, the Close bar hides after 3 s; the corner ••• button brings it back
+  // (a tap on the picture itself is kept free for controlling the Mac).
+  const [bar, setBar] = useState(true);
+  const hide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showBar = () => {
+    setBar(true);
+    clearTimeout(hide.current);
+    hide.current = setTimeout(() => setBar(false), 3000);
+  };
+  const live = !!stream && !msg;
+  useEffect(() => {
+    if (live) showBar();
+    else {
+      clearTimeout(hide.current);
+      setBar(true);
+    }
+    return () => clearTimeout(hide.current);
+  }, [live]);
   const video = stream ? (
     <RTCView streamURL={stream.toURL()} objectFit="contain" style={{ width, height }} />
   ) : null;
@@ -181,10 +199,22 @@ export default function Viewer({
             {msg}
           </Text>
         ) : null}
-        <View style={[st.bar, { paddingBottom: inset.bottom + 14 }]}>
-          {error ? <Btn label="Try again" onPress={() => setAttempt(n => n + 1)} /> : null}
-          <Btn label="Close" onPress={onClose} />
-        </View>
+        {bar ? (
+          <View style={[st.bar, { paddingBottom: inset.bottom + 14 }]}>
+            {error ? <Btn label="Try again" onPress={() => setAttempt(n => n + 1)} /> : null}
+            <Btn label="Close" onPress={onClose} />
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Show controls"
+            hitSlop={12}
+            onPress={showBar}
+            style={[st.more, { top: inset.top + 10 }]}
+          >
+            <Text style={st.moreText}>•••</Text>
+          </Pressable>
+        )}
       </View>
     </Modal>
   );
@@ -237,5 +267,15 @@ const st = StyleSheet.create({
     borderColor: '#fff6',
   },
   pressed: { opacity: 0.6 },
+  more: {
+    position: 'absolute',
+    right: 14,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 99,
+    backgroundColor: '#0007',
+    opacity: 0.6,
+  },
+  moreText: { color: '#fff', fontSize: 16, letterSpacing: 1 },
   btnText: { color: '#fff', fontFamily: 'Onest-SemiBold', fontSize: 17 },
 });
