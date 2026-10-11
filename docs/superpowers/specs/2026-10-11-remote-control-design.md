@@ -73,8 +73,8 @@ viewer stays view-only with no errors. Moves are coalesced to one per animation 
 - Menu: **Allow remote control** (UserDefaults `remoteControl`, default true) under **Allow screen viewing**.
 - Icon: `eye` while watched (unchanged); `cursorarrow.motionlines` while input arrived in the last 5 s, with
   accessibility text "MacWake: someone is controlling this Mac".
-- Lock screen: first plan task probes whether injected keys reach the lock screen's password field. If they do, the
-  viewer's locked notice says "Mac is locked. Type your password to unlock." Otherwise it stays "Mac is locked".
+- Lock screen: checked in the live test (the owner locks the Mac and types the password from the viewer). If it
+  unlocks, the viewer's locked notice becomes "Mac is locked. Type your password to unlock." Otherwise it stays.
 - Version 1.6.
 
 ## Viewer logic (`console-next/lib/control.js`, mirrored in `mobile/src/control.ts`)
@@ -118,7 +118,7 @@ Other pure helpers, all tested:
 - Keeps the existing `control` channel object and reads `control` messages next to `locked`.
 - Mouse (`pointerType === "mouse"`): move → `m` (coalesced per frame), buttons → `b`, wheel → `s` (passive: false,
   preventDefault), context menu suppressed. Keyboard: `keydown`/`keyup` on window → `k` with `e.code`,
-  preventDefault. Browsers keep ⌘W, ⌘T, ⌘N, ⌘Q, ⌘Tab for themselves; the keys row covers those on touch devices.
+  preventDefault, except key presses on the viewer's own buttons; Shift+Escape moves focus to Close (no keyboard trap). Browsers keep ⌘W, ⌘T, ⌘N, ⌘Q, ⌘Tab for themselves; the keys row covers those on touch devices.
   On window blur, send key-up for every key still held.
 - Touch/pen: pointer events into the gesture machine, `touch-action: none` on the picture.
 - Control bar, touch devices only (`(pointer: coarse)`): Direct / Trackpad switch, keyboard button, Close. Fades like
@@ -137,13 +137,12 @@ Other pure helpers, all tested:
   unzoomed coordinates. Trackpad mode resets zoom to 1 and turns zooming off.
 - Phone keyboard: hidden `TextInput` (autoCorrect, spellCheck, autoCapitalize off, `smartInsertDelete={false}`) kept
   at a one-space sentinel so Backspace is always seen; `onKeyPress` Backspace/Enter → `k`, inserted text → `t`.
-- iPad hardware keyboard: native module `HardwareKeys` (`mobile/ios/MacWake/HardwareKeys.swift` + `.m`) using
-  GameController's `GCKeyboard.coalesced.keyboardInput.keyChangedHandler`, which reports every key's HID usage and
-  up/down regardless of focus. Emits `{usage, down}`; JS maps with `hidToCode` and sends `k`. `start()` / `stop()`
-  with the viewer. When a hardware keyboard is connected the keyboard button is hidden (the keys row still shows on
-  demand for ⌘Tab, ⌘Space and other shortcuts iPadOS keeps). Fallback if GameController doesn't deliver in a plain
-  UIKit app: `pressesBegan`/`pressesEnded` in a responder at the end of the chain (AppDelegate). The plan probes this
-  first.
+- iPad hardware keyboard: native module `HardwareKeys` (`mobile/ios/MacWake/HardwareKeys.swift` + `.m`). While the
+  viewer is open, a hidden `UIView` holds first responder and overrides `pressesBegan`/`pressesEnded`, so every key's
+  HID usage and up/down reaches it (documented UIKit, no focus guessing). Emits `{usage, down}`; JS maps with
+  `hidToCode` and sends `k`. `GCKeyboard.coalesced` only answers "is a keyboard attached" (`keyboard` event). When the
+  phone-keyboard input takes focus it becomes first responder instead; on blur the catcher takes it back. When a
+  hardware keyboard is attached, **Keys** shows only the keys row (for ⌘Tab, ⌘Space and other shortcuts iPadOS keeps).
 - Android: no `HardwareKeys`; everything else works.
 
 ## Errors and states
@@ -174,9 +173,9 @@ input.
 
 ## Order
 
-1. Probes: lock-screen typing; `GCKeyboard` delivery in the RN app.
-2. Shared logic + tests (web, then mobile mirror).
-3. Mac injector, permission, menu, icon.
-4. Web viewer UI.
-5. App viewer UI + `HardwareKeys`.
+1. Shared logic + tests (web, then mobile mirror).
+2. Mac injector, permission, menu, icon.
+3. Web viewer UI.
+4. App viewer UI + `HardwareKeys`.
+5. Live test on this Mac with the owner (includes the lock-screen check).
 6. READMEs, CLAUDE.md, version 1.6 build; website copy after.
