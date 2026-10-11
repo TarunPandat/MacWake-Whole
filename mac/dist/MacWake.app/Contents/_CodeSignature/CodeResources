@@ -15,10 +15,10 @@
 		<dict>
 			<key>cdhash</key>
 			<data>
-			0LgQrCQ1LorN7/fVP4js4Hz+uy8=
+			ZxIxvm1H7Emc1KX9MQf8t03Bi08=
 			</data>
 			<key>requirement</key>
-			<string>cdhash H"d0b810ac24352e8acdeff7d53f88ece07cfebb2f" or cdhash H"d0da175a48cdcb7bd2fae59d75db6e5af611c07e"</string>
+			<string>identifier "org.webrtc.WebRTC" and certificate leaf = H"561dbb45c6c967724fdec990722136e4224bbd54"</string>
 		</dict>
 		<key>Resources/AppIcon.icns</key>
 		<dict>

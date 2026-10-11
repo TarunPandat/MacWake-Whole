@@ -35,13 +35,27 @@ if [ -n "$CONSOLE_URL" ]; then
   echo "console URL baked in: ${CONSOLE_URL%/}"
 fi
 printf 'APPL????' > "$APP/Contents/PkgInfo"
-# A stable signature keeps the Screen Recording permission across rebuilds; an ad-hoc one changes every build.
+# A stable signature keeps the Screen Recording permission across rebuilds and updates; an ad-hoc one is tied to a
+# single build. Self-signed identity in its own keychain: nothing goes into your login keychain, nothing is trusted.
+# ponytail: fixed keychain password, it only guards this local signing key. Keep the folder: a new key means every
+# Mac has to allow Screen Recording once more.
 ID="MacWake Local Signing"
-if security find-identity -p codesigning | grep -q "\"$ID\""; then SIGN=$ID; else
-  SIGN=-; echo "warning: no \"$ID\" identity, so Screen Recording resets on every build. Run tools/make-signing-cert.sh once."
+KC="$HOME/Library/Application Support/MacWake Build/signing.keychain-db"
+if [ ! -f "$KC" ]; then
+  D=$(mktemp -d)
+  printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=%s\n[ext]\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\nbasicConstraints=critical,CA:false\n' "$ID" > "$D/cert.cnf"
+  /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -config "$D/cert.cnf" -keyout "$D/key.pem" -out "$D/cert.pem" 2>/dev/null
+  /usr/bin/openssl pkcs12 -export -inkey "$D/key.pem" -in "$D/cert.pem" -name "$ID" -out "$D/id.p12" -passout pass:macwake
+  mkdir -p "$(dirname "$KC")"
+  security create-keychain -p macwake "$KC"
+  security import "$D/id.p12" -k "$KC" -P macwake -T /usr/bin/codesign >/dev/null
+  rm -rf "$D"
+  echo "created signing key: $KC"
 fi
-codesign --force -s "$SIGN" "$APP/Contents/Frameworks/WebRTC.framework"
-codesign --force -s "$SIGN" "$APP"
+security unlock-keychain -p macwake "$KC"
+security set-key-partition-list -S apple-tool:,apple: -s -k macwake "$KC" >/dev/null 2>&1 || true
+codesign --force --keychain "$KC" -s "$ID" "$APP/Contents/Frameworks/WebRTC.framework"
+codesign --force --keychain "$KC" -s "$ID" "$APP"
 mkdir dist/dmg && cp -R "$APP" dist/dmg/ && ln -s /Applications dist/dmg/Applications
 # diskutil image create is the non-deprecated tool on macOS 26+; older systems only have hdiutil.
 diskutil image create from dist/dmg --volumeName MacWake --format UDZO dist/MacWake.dmg >/dev/null 2>&1 \

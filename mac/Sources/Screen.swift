@@ -68,7 +68,11 @@ final class ScreenShare {
 
     func answer(_ offer: Offer, ice: [Ice]) {
         guard allowed() else { return post(offer.id, ["error": "disabled"]) }
-        guard CGPreflightScreenCaptureAccess() else { return post(offer.id, ["error": "permission"]) }
+        guard CGPreflightScreenCaptureAccess() else {
+            // Lists this exact build under Screen Recording (an older build's grant doesn't carry over) and asks once.
+            _ = CGRequestScreenCaptureAccess()
+            return post(offer.id, ["error": "permission"])
+        }
         session?.stop()
         let s = ViewSession(ice: ice)
         session = s

@@ -55,8 +55,9 @@ Build with your console's address baked in, so the app needs no typing:
 CONSOLE_URL=https://your-console.vercel.app sh mac/build.sh    # -> mac/dist/MacWake.dmg
 ```
 
-Building it yourself? Run `sh tools/make-signing-cert.sh` once first. It creates a free local signing certificate, so
-macOS keeps MacWake's Screen Recording permission when you rebuild or update.
+The build signs the app with a free local signing key it creates once in `~/Library/Application Support/MacWake Build/`
+(its own keychain; your login keychain is untouched), so macOS keeps MacWake's Screen Recording permission across
+rebuilds and updates. Keep that folder: a new key means allowing Screen Recording again on every Mac.
 
 Open the DMG, drag **MacWake** to Applications, and open it from Applications. It refuses
 to set up from the DMG or from `mac/dist`. On first run it:
