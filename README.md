@@ -87,16 +87,25 @@ Menu bar → **Sleep now**. On your phone, tap **Wake up Mac**. The console show
 The Mac stays awake for the configured hold time (default 30 min) or until you tap
 **Cancel / let it sleep**. Log: `/Library/Logs/MacWake.log` (menu bar → Show log).
 
-## Watch the screen
+## Watch and control the screen
 
-Tap **Watch screen** in the console or the app to see your Mac's screen live (view-only for now). It wakes the Mac
-if needed and connects on its own; the Mac shows an eye in its menu bar and macOS's own recording indicator while
-someone watches. Video goes straight from the Mac to your phone, encrypted; the console only passes the connection
-setup along.
+Tap **Watch screen** in the console or the app to see your Mac's screen live and control it. It wakes the Mac if
+needed and connects on its own; the Mac shows an eye in its menu bar while someone watches, a pointer while someone
+controls it, and macOS's own recording indicator. Video and input go straight between the Mac and your phone,
+encrypted; the console only passes the connection setup along.
+
+- **Computer browsers**: use your mouse and keyboard on the picture. Browsers keep a few shortcuts for themselves
+  (⌘W, ⌘T, ⌘Q, ⌘Tab). Shift+Escape moves to the Close button.
+- **Phones and tablets**: **Direct** mode taps where you want to click, drags to scroll, long-presses to right-click,
+  and long-presses then drags to drag or select. **Trackpad** mode moves the pointer like a laptop trackpad (two
+  fingers scroll, two-finger tap right-clicks). **Keys** opens the keyboard plus a row with esc, tab, arrows and
+  sticky ⌘ ⌥ ⌃ ⇧ (tap ⌘, then type c, for ⌘C). On iPad, a Magic Keyboard sends every key directly.
 
 - MacWake's menu-bar app must be running (it starts at login) and someone must be logged in on the Mac.
 - Allow Screen Recording once when setup asks (System Settings → Privacy & Security → Screen Recording).
-- After a wake the Mac usually shows its lock screen; you'll see it, but view-only can't unlock it.
+- Allow Accessibility once when setup asks (System Settings → Privacy & Security → Accessibility) so MacWake can
+  move the pointer and type. Turn control off with **Allow remote control** in the menu; viewing keeps working.
+- After a wake the Mac usually shows its lock screen.
 - Lid closed without an external display means there's no screen to show.
 - Turn it off on the Mac with **Allow screen viewing** in the menu. **New token (unpair all phones)…** locks out
   every phone and browser that had the old token.
@@ -119,7 +128,7 @@ setup along.
   a few minutes), then sleeps until the next timer. Check the log.
 - **Hibernate**: leave `hibernatemode` at the default 3. The RTC alarm also wakes from
   hibernation, but restoring from the disk image makes every check-in much slower.
-- **Each Mac's token** protects that Mac on the console and the API, and now also opens its screen. Treat it like a
+- **Each Mac's token** protects that Mac on the console and the API, and now also opens and controls its screen. Treat it like a
   password; use **New token (unpair all phones)…** if it leaks.
 - Cloudflare free tier allows 1000 KV writes/day; each Mac only writes on change or every
   5 min (about 300/day), so it fits about three Macs. For more, use `console-next/`.

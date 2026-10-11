@@ -14,6 +14,9 @@ sleep light, status words, facts, Timing panel and thumb-zone button.
 | `src/Scanner.tsx` | Camera QR scanner for the Mac's "Pair phone…" code (iOS; VisionCamera). Loaded only when opened. |
 | `src/core.ts` | Console client and all status logic, ported from the web console. No React, no native code. |
 | `src/core.check.ts` | Tests for it: QR parsing, every status, API calls and error messages. `npm run test:core` |
+| `src/control.ts` | Remote control logic (gestures, keys, batching), mirrored from `console-next/lib/control.js`. Tests: `src/control.check.ts`. |
+| `src/Controls.tsx` | Touch handling, phone keyboard, Mac keys row, iPad hardware keys hook. |
+| `ios/MacWake/HardwareKeys.swift` | Native module: iPad hardware keyboard keys (HID usage, up/down) while the viewer is open. |
 | `assets/fonts/` | Onest Regular, Medium, SemiBold (SIL OFL, `OFL.txt`), registered in iOS `UIAppFonts` and Android `assets/fonts`. |
 | `ios/MacWake/LaunchScreen.storyboard` | Launch screen. Its mark and background come from `../tools/make-splash.sh`. |
 | `ios/`, `android/` | Native projects. App icon comes from `../tools/make-icons.sh`. |
@@ -87,3 +90,5 @@ If the bundle ID `io.macwake.mobile` is taken under your team, change it in Xcod
 "Watch screen" opens a full-screen live view of the Mac (view-only; pinch to zoom on iOS). It uses
 `react-native-webrtc` (pinned 124.0.8); after installing or updating it run `cd ios && LANG=en_US.UTF-8 pod install`
 and restart Metro. Decisions and text live in `src/core.ts` and mirror `console-next/lib/screen.js`.
+
+While watching, the Mac can be controlled: Direct/Trackpad touch modes, Keys for the phone keyboard and Mac keys row, and an iPad hardware keyboard sends keys directly (iOS only).
