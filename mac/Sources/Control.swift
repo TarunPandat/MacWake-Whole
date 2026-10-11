@@ -98,7 +98,7 @@ final class Injector {
         guard let e = CGEvent(keyboardEventSource: source, virtualKey: vk, keyDown: down) else { return }
         if flag != nil { e.type = .flagsChanged }
         if repeated { e.setIntegerValueField(.keyboardEventAutorepeat, value: 1) }
-        post(e)
+        post(e, flags: flags.union(keyMarks[code] ?? []))
     }
 
     /// Text from a phone keyboard, any language: Unicode key events of at most 20 UTF-16 units, never splitting a character.
@@ -137,6 +137,15 @@ private let modifierFlags: [String: CGEventFlags] = [
     "MetaLeft": .maskCommand, "MetaRight": .maskCommand, "ShiftLeft": .maskShift, "ShiftRight": .maskShift,
     "AltLeft": .maskAlternate, "AltRight": .maskAlternate, "ControlLeft": .maskControl, "ControlRight": .maskControl,
 ]
+
+/// Real keyboards mark arrows (fn + keypad) and the other navigation and F-keys (fn). macOS's own shortcuts, such as
+/// ⌃← / ⌃→ for switching Spaces and ⌃↑ for Mission Control, only match key events that carry those marks.
+private let keyMarks: [String: CGEventFlags] = {
+    var m: [String: CGEventFlags] = [:]
+    for k in ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"] { m[k] = [.maskSecondaryFn, .maskNumericPad] }
+    for k in ["Home", "End", "PageUp", "PageDown", "Delete", "Insert"] + (1...12).map({ "F\($0)" }) { m[k] = .maskSecondaryFn }
+    return m
+}()
 
 /// Browser KeyboardEvent.code -> macOS virtual key code (HIToolbox kVK_*), ANSI positions.
 private let keyCodes: [String: CGKeyCode] = [

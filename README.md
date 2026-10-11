@@ -100,6 +100,10 @@ encrypted; the console only passes the connection setup along.
   and long-presses then drags to drag or select. **Trackpad** mode moves the pointer like a laptop trackpad (two
   fingers scroll, two-finger tap right-clicks). **Keys** opens the keyboard plus a row with esc, tab, arrows and
   sticky ⌘ ⌥ ⌃ ⇧ (tap ⌘, then type c, for ⌘C). On iPad, a Magic Keyboard sends every key directly.
+- **Spaces and Mission Control**: swipe with three fingers on the screen, like on a Mac trackpad: left or right
+  switches Space, up opens Mission Control, down App Exposé. ⌃← / ⌃→ / ⌃↑ / ⌃↓ work from a keyboard or the keys
+  row too. On iPad, four fingers work once iPadOS's own four- and five-finger gestures are off (Settings →
+  Multitasking & Gestures); the Magic Keyboard's trackpad swipes always stay with iPadOS.
 
 - MacWake's menu-bar app must be running (it starts at login) and someone must be logged in on the Mac.
 - Allow Screen Recording once when setup asks (System Settings → Privacy & Security → Screen Recording).

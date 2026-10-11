@@ -320,6 +320,96 @@ eq(
   'too late for a double tap: its own spot',
 );
 
+// Three or more fingers: Mac trackpad swipes (switch Space, Mission Control, App Exposé), in both modes.
+const ctrl = k => [
+  { k: 'ControlLeft', d: 1 },
+  { k, d: 1 },
+  { k, d: 0 },
+  { k: 'ControlLeft', d: 0 },
+];
+for (const mode of ['direct', 'trackpad']) {
+  g = createGestures(mode, view);
+  g.down(1, 100, 50, 0);
+  g.down(2, 120, 50, 5);
+  eq(g.down(3, 140, 50, 10), [], `${mode}: a third finger starts a swipe`);
+  eq(g.move(1, 10, 50, 50), [], `${mode}: not far enough yet`);
+  eq(
+    g.move(2, 30, 50, 60),
+    ctrl('ArrowRight'),
+    `${mode}: fingers left go to the next Space (⌃→)`,
+  );
+  eq(g.move(3, 50, 50, 70), [], `${mode}: one swipe, one switch`);
+  g.up(1, 100);
+  g.up(2, 100);
+  eq(g.up(3, 100), [], `${mode}: lifting does nothing more`);
+  eq(g.state, 'idle', `${mode}: idle again`);
+  g.down(1, 10, 50, 0);
+  g.down(2, 30, 50, 0);
+  g.down(3, 50, 50, 0);
+  g.move(1, 100, 50, 50);
+  eq(
+    g.move(2, 120, 50, 60),
+    ctrl('ArrowLeft'),
+    `${mode}: fingers right go to the previous Space (⌃←)`,
+  );
+  g.up(1, 100);
+  g.up(2, 100);
+  g.up(3, 100);
+  g.down(1, 60, 80, 0);
+  g.down(2, 100, 80, 0);
+  g.down(3, 140, 80, 0);
+  g.move(1, 60, 10, 50);
+  g.move(2, 100, 10, 60);
+  eq(
+    g.move(3, 140, 10, 70),
+    ctrl('ArrowUp'),
+    `${mode}: fingers up open Mission Control (⌃↑)`,
+  );
+  g.up(1, 100);
+  g.up(2, 100);
+  g.up(3, 100);
+  g.down(1, 60, 10, 0);
+  g.down(2, 100, 10, 0);
+  g.down(3, 140, 10, 0);
+  g.move(1, 60, 80, 50);
+  g.move(2, 100, 80, 60);
+  eq(
+    g.move(3, 140, 80, 70),
+    ctrl('ArrowDown'),
+    `${mode}: fingers down open App Exposé (⌃↓)`,
+  );
+  g.up(1, 100);
+  g.up(2, 100);
+  g.up(3, 100);
+  g.down(1, 100, 50, 0);
+  g.down(2, 120, 50, 0);
+  g.down(3, 140, 50, 0);
+  g.move(1, 110, 55, 50);
+  g.up(1, 100);
+  g.up(2, 100);
+  eq(g.up(3, 100), [], `${mode}: three fingers that barely move do nothing`);
+  g.down(1, 50, 50, 0);
+  g.down(2, 70, 50, 0);
+  g.down(3, 90, 50, 0);
+  eq(
+    g.down(4, 110, 50, 10),
+    [],
+    `${mode}: a fourth finger keeps the swipe going`,
+  );
+  g.move(1, 0, 50, 50);
+  g.move(2, 20, 50, 50);
+  g.move(3, 40, 50, 50);
+  eq(
+    g.move(4, 60, 50, 60),
+    ctrl('ArrowRight'),
+    `${mode}: four fingers left switch Space too`,
+  );
+  g.up(1, 100);
+  g.up(2, 100);
+  g.up(3, 100);
+  g.up(4, 100);
+}
+
 eq(
   Object.keys(CONTROL_MESSAGES).sort(),
   ['off', 'permission'],

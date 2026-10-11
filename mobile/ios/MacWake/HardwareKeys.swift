@@ -55,6 +55,8 @@ final class HardwareKeys: RCTEventEmitter {
 final class KeyCatcher: UIView {
   var onKey: (Int, Bool) -> Void = { _, _ in }
   override var canBecomeFirstResponder: Bool { true }
+  /// Three-finger swipes go to the Mac (switch Space), not to iOS's undo / redo.
+  override var editingInteractionConfiguration: UIEditingInteractionConfiguration { .none }
   override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) { report(presses, true) }
   override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) { report(presses, false) }
   override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) { report(presses, false) }

@@ -17,6 +17,8 @@ type State =
   | 'drag'
   | 'two'
   | 'twoScroll'
+  | 'swipe'
+  | 'swiped'
   | 'ignore';
 
 export const CONTROL_MESSAGES: Record<'off' | 'permission', string> = {
@@ -31,6 +33,7 @@ export const TWO_TAP = 300; // ms, two-finger tap (trackpad right click)
 // ms: a tap this soon after the last, within SLOP, reuses its spot (a zoomed-out phone picture turns a
 // 2 px wobble into more than the Mac's 4 pt double-click radius)
 const DOUBLE_TAP = 500;
+export const SWIPE = 50; // px the fingers' midpoint travels before a 3+-finger swipe counts
 const GAIN = 1.5; // trackpad: pointer moves 1.5x the finger,
 const FAST = 0.8; // twice that above 0.8 px/ms
 
@@ -103,6 +106,23 @@ export function createGestures(mode: Mode, view: () => PictureView) {
     { b, d: 0 },
   ];
   const letGo = (): Msg[] => (state === 'drag' ? [{ b: 0, d: 0 }] : []);
+  // A 3+-finger swipe, like on a Mac trackpad: left/right switch Space (⌃→ / ⌃←), up Mission Control, down App Exposé.
+  const swipe = (dx: number, dy: number): Msg[] => {
+    const k =
+      Math.abs(dx) >= Math.abs(dy)
+        ? dx < 0
+          ? 'ArrowRight'
+          : 'ArrowLeft'
+        : dy < 0
+        ? 'ArrowUp'
+        : 'ArrowDown';
+    return [
+      { k: 'ControlLeft', d: 1 },
+      { k, d: 1 },
+      { k, d: 0 },
+      { k: 'ControlLeft', d: 0 },
+    ];
+  };
   const tap = (p: Touch, t: number): Msg[] => {
     if (
       direct &&
@@ -149,6 +169,15 @@ export function createGestures(mode: Mode, view: () => PictureView) {
         prev = centroid();
         return [];
       }
+      // three or more fingers: a trackpad swipe; a new finger restarts the measuring
+      if (touches.size >= 3) {
+        const out = letGo();
+        if (state !== 'swiped') {
+          state = 'swipe';
+          prev = centroid();
+        }
+        return out;
+      }
       // more fingers than the gesture uses (direct: the iOS zoom pinch): wait until all lift
       const out = letGo();
       state = 'ignore';
@@ -188,6 +217,14 @@ export function createGestures(mode: Mode, view: () => PictureView) {
         case 'drag':
           out = [direct ? point(x, y) : nudge(x - prev.x, y - prev.y, dt)];
           break;
+        case 'swipe': {
+          const c = centroid();
+          const dx = c.x - prev.x;
+          const dy = c.y - prev.y;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE) return [];
+          state = 'swiped';
+          return swipe(dx, dy);
+        }
         case 'two':
           if (![...touches.values()].some(far)) return [];
           state = 'twoScroll';
